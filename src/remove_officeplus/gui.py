@@ -23,7 +23,7 @@ class ModernGUI(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("Remove-OfficePlus | 微软 OfficePLUS 顽固插件根除器")
+        self.title("Remove-OfficePlus | Office 顽固插件彻底根除器")
         self.geometry("780x620")
         self.minsize(680, 520)
 
@@ -92,7 +92,7 @@ class ModernGUI(tk.Tk):
             perm_bar.pack(fill="x", pady=(10, 0))
             perm_label = tk.Label(
                 perm_bar,
-                text="⚠️ 当前以普通权限运行，清理服务与系统级注册表需要管理员权限。",
+                text="[提示] 当前以普通权限运行，清理服务与系统级注册表需要管理员权限。",
                 bg="#FEF3C7",
                 fg="#92400E",
                 font=self.sub_font
@@ -116,7 +116,7 @@ class ModernGUI(tk.Tk):
             perm_bar.pack(fill="x", pady=(10, 0))
             perm_label = tk.Label(
                 perm_bar,
-                text="🛡️ 已获取管理员权限 (Administrator)，具备完整的深度根除清理能力。",
+                text="[状态] 已获取管理员权限 (Administrator)，具备完整的深度根除清理能力。",
                 bg="#DEF7EC",
                 fg="#03543F",
                 font=self.sub_font
@@ -139,7 +139,7 @@ class ModernGUI(tk.Tk):
 
         self.scan_btn = tk.Button(
             btn_frame,
-            text="🔍 重新排查扫描",
+            text="重新排查扫描",
             bg="#3B82F6",
             fg="#FFFFFF",
             font=("Microsoft YaHei UI", 10, "bold"),
@@ -153,7 +153,7 @@ class ModernGUI(tk.Tk):
 
         self.nuke_btn = tk.Button(
             btn_frame,
-            text="💥 一键彻底根除",
+            text="一键彻底根除",
             bg="#EF4444",
             fg="#FFFFFF",
             font=("Microsoft YaHei UI", 10, "bold"),
@@ -232,7 +232,7 @@ class ModernGUI(tk.Tk):
 
     def _on_scan_finished(self, report: ScanReport):
         self.set_buttons_state(True)
-        self.status_label.config(text=f"扫描完成：发现 {report.total_threats} 项相关威胁")
+        self.status_label.config(text=f"扫描完成：发现 {report.total_threats} 项相关残留")
 
         # 更新卡片数值与颜色
         self.card_proc_val.config(
@@ -278,9 +278,9 @@ class ModernGUI(tk.Tk):
             self.log("  [+] 未发现任何 OfficePLUS 文件或缓存残留。", "success")
 
         if report.is_clean:
-            self.log("✨ 检查完毕：你的系统干干净净，未发现任何 OfficePLUS 残留！", "success")
+            self.log("[完成] 检查完毕：系统处于干净状态，未发现任何 OfficePLUS 残留。", "success")
         else:
-            self.log(f"⚠️ 检查完毕：共排查出 {report.total_threats} 处残留，点击「一键彻底根除」即可清理。", "warn")
+            self.log(f"[提示] 检查完毕：共排查出 {report.total_threats} 处残留，点击「一键彻底根除」即可清理。", "warn")
 
     def confirm_nuke(self):
         if not self.is_admin_user:
@@ -312,7 +312,7 @@ class ModernGUI(tk.Tk):
         self.log(f"  [+] 已清理 {len(regs)} 项注册表加载项", "success")
         self.log(f"  [+] 已清理 {len(tasks)} 项计划任务", "success")
         self.log(f"  [+] 已强删 {len(dirs)} 处程序与缓存目录", "success")
-        self.log("🎉 微软 OfficePLUS 及关联组件已全部彻底根除！", "success")
+        self.log("[完成] 微软 OfficePLUS 及关联组件已全部彻底根除。", "success")
         self.log("==================================================\n", "muted")
 
         messagebox.showinfo("清理完成", "微软 OfficePLUS 及关联组件已全部彻底清除！\n现在系统将自动进行一次复检。")

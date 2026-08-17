@@ -1,4 +1,4 @@
-name: 🐛 变种特征 / Bug 报告
+name: 变种特征 / Bug 报告
 description: 提交未被清除的 Office 插件变种、残留路径或运行报错
 title: "【变种/Bug反馈】: "
 labels: ["bug", "triage"]

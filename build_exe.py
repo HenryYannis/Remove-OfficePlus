@@ -42,7 +42,7 @@ def build():
     exe_path = os.path.join(dist_dir, "Remove-OfficePlus-GUI.exe")
     if os.path.exists(exe_path):
         size_mb = os.path.getsize(exe_path) / (1024 * 1024)
-        print(f"\n🎉 构建成功！输出可执行文件: {exe_path} ({size_mb:.2f} MB)")
+        print(f"\n[+] 构建成功！输出可执行文件: {exe_path} ({size_mb:.2f} MB)")
     else:
         print("\n[!] 构建异常：未在 dist 目录找到可执行文件。")
 

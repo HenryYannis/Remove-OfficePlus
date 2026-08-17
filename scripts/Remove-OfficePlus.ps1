@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Remove-OfficePlus: 一键彻底根除「微软 OfficePLUS」及同类顽固 Office 加载项。
 
@@ -338,7 +338,7 @@ function Invoke-OfficePlusNuke {
     }
 
     Write-Host "`n============================================================" -ForegroundColor Green
-    Write-Host " 🎉 微软OfficePLUS 及关联组件已全部彻底根除！" -ForegroundColor Green
+    Write-Host "  [+] 微软 OfficePLUS 及关联组件已全部彻底根除。" -ForegroundColor Green
     Write-Host "============================================================" -ForegroundColor Green
 
     # 执行清理后复检
