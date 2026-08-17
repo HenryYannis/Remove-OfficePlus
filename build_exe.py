@@ -11,13 +11,6 @@ import shutil
 def build():
     print("=== 开始构建 Remove-OfficePlus 独立绿色版程序 (.exe) ===")
     
-    # 检查 PyInstaller
-    try:
-        import PyInstaller
-    except ImportError:
-        print("[!] 正在安装 PyInstaller 打包工具...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
-
     dist_dir = os.path.abspath("dist")
     build_dir = os.path.abspath("build")
 
@@ -27,10 +20,11 @@ def build():
         "-m",
         "PyInstaller",
         "--noconfirm",
-        "--onedir", # 或 --onefile
         "--onefile",
         "--windowed", # 隐藏黑窗，纯 GUI 界面
         "--name", "Remove-OfficePlus-GUI",
+        "--paths", os.path.abspath("src"),
+        "--collect-all", "remove_officeplus",
         "--uac-admin", # 自动向 Windows 请求 UAC 管理员提权
         "--clean",
         os.path.abspath("main.py")
