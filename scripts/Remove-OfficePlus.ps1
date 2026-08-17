@@ -1,9 +1,9 @@
 ﻿<#
 .SYNOPSIS
-    Remove-OfficePlus: 一键彻底根除“微软OfficePLUS”及同类顽固 Office 加载项。
+    Remove-OfficePlus: 一键彻底根除「微软 OfficePLUS」及同类顽固 Office 加载项。
 
 .DESCRIPTION
-    本脚本用于扫描、诊断并彻底清除“微软OfficePLUS”插件。
+    本脚本用于扫描、诊断并彻底清除「微软 OfficePLUS」插件。
     包括停止并注销后台守护服务、清理系统全局 (HKLM) 与用户级 (HKCU) 注册表强载项、删除应用与缓存目录、清理计划任务。
 
 .PARAMETER Scan
@@ -51,11 +51,19 @@ function Elevate-Privileges {
     if (-not (Test-IsAdmin)) {
         Write-Host "`n[!] 检测到当前非管理员权限，正在请求 UAC 管理员提权..." -ForegroundColor Yellow
         $scriptPath = $MyInvocation.MyCommand.Definition
-        $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
-        if ($Scan) { $argList += " -Scan" }
-        if ($Nuke) { $argList += " -Nuke" }
-        if ($NoBackup) { $argList += " -NoBackup" }
-        if ($Force) { $argList += " -Force" }
+        
+        # 判断是否为本地文件运行还是 irm 在线管道运行
+        if ($scriptPath -and (Test-Path $scriptPath)) {
+            $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+            if ($Scan) { $argList += " -Scan" }
+            if ($Nuke) { $argList += " -Nuke" }
+            if ($NoBackup) { $argList += " -NoBackup" }
+            if ($Force) { $argList += " -Force" }
+        } else {
+            # 在线 Web 执行模式下的提权
+            $onlineCmd = "irm https://raw.githubusercontent.com/HenryYannis/Remove-OfficePlus/main/scripts/Remove-OfficePlus.ps1 | iex"
+            $argList = "-NoProfile -ExecutionPolicy Bypass -Command `"$onlineCmd`""
+        }
 
         try {
             Start-Process powershell -Verb RunAs -ArgumentList $argList
@@ -123,7 +131,7 @@ function Show-Banner {
     Clear-Host
     Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host "         Remove-OfficePlus  |  Office 流氓插件彻底根除器     " -ForegroundColor Yellow
-    Write-Host "         Open Source: https://github.com/Remove-OfficePlus  " -ForegroundColor DarkGray
+    Write-Host "       https://github.com/HenryYannis/Remove-OfficePlus     " -ForegroundColor DarkGray
     Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host ""
 }
@@ -247,17 +255,30 @@ function Invoke-OfficePlusNuke {
 
     # 注册表备份
     if (-not $NoBackup) {
-        $backupDir = "$PSScriptRoot\..\backup_regs"
+        $backupDir = if ($PSScriptRoot) { "$PSScriptRoot\..\backup_regs" } else { "$env:TEMP\OfficePLUS_backup_regs" }
         if (-not (Test-Path $backupDir)) {
             New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
         }
         $timestamp = (Get-Date).ToString("yyyyMMdd_HHmmss")
         $backupFile = "$backupDir\OfficePLUS_RegBackup_$timestamp.reg"
-        Write-Info "正在自动导出注册表备份至: $backupFile"
+        Write-Info "正在自动检测并导出注册表备份至: $backupFile"
         
-        # 导出可能存在的项
-        & reg.exe export "HKLM\Software\Microsoft\Office\Word\Addins\MSOfficePLUS" "$backupFile.1" /y 2>$null
-        Write-Success "备份处理完毕。"
+        $exportedCount = 0
+        foreach ($reg in $TargetRegistryKeys) {
+            if (Test-Path $reg) {
+                $rawRegPath = $reg -replace 'HKLM:\\', 'HKLM\' -replace 'HKCU:\\', 'HKCU\'
+                $tempExport = "$backupDir\part_$exportedCount.reg"
+                & reg.exe export "$rawRegPath" "$tempExport" /y 2>$null
+                if (Test-Path $tempExport) {
+                    $exportedCount++
+                }
+            }
+        }
+        if ($exportedCount -gt 0) {
+            Write-Success "已成功备份 $exportedCount 项注册表数据。"
+        } else {
+            Write-Info "未发现需备份的注册表项。"
+        }
     }
 
     # 1. 终止所有占用进程
@@ -309,6 +330,8 @@ function Invoke-OfficePlusNuke {
     Write-Step "第 5/5 步: 彻底删除安装目录与所有缓存..."
     foreach ($dir in $TargetDirectories) {
         if (Test-Path $dir) {
+            # 解除只读/隐藏/系统文件属性锁定
+            & cmd.exe /c "attrib -r -s -h `"$dir\*`" /s /d" 2>$null
             Remove-Item -Path $dir -Recurse -Force -ErrorAction SilentlyContinue
             Write-Success "已删除目录: $dir"
         }

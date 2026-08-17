@@ -122,12 +122,20 @@ def clean_scheduled_tasks() -> List[str]:
         pass
     return cleaned
 
+def _on_rm_error(func, path, exc_info):
+    import stat
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
 def delete_directories() -> List[str]:
     deleted = []
     for d in get_target_directories():
         if os.path.exists(d):
             try:
-                shutil.rmtree(d, ignore_errors=True)
+                shutil.rmtree(d, onerror=_on_rm_error)
                 if not os.path.exists(d):
                     deleted.append(d)
             except Exception:

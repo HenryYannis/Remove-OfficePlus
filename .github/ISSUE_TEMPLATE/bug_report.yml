@@ -1,0 +1,31 @@
+name: 🐛 变种特征 / Bug 报告
+description: 提交未被清除的 Office 插件变种、残留路径或运行报错
+title: "【变种/Bug反馈】: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量提供详细的残留路径或报错日志，以便快速加入清理规则库。
+  - type: input
+    id: os_version
+    attributes:
+      label: Windows 系统版本
+      description: 例如 Windows 10 22H2 / Windows 11 23H2 (64位)
+      placeholder: Windows 11 专业版
+    validations:
+      required: true
+  - type: textarea
+    id: symptoms
+    attributes:
+      label: 异常现象或残留详情
+      description: 请详细描述该 Office 插件的表现（如后台常驻进程名、Office 顶部加载项名称、弹窗特征等）
+      placeholder: 在 PPT 顶部依然存在 OfficePLUS 菜单，或者开机后自启动等……
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 运行日志 / 终端输出
+      description: 粘贴 PowerShell 或 Python 诊断排查 (`-Scan`) 的输出内容
+      render: shell

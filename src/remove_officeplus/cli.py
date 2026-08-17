@@ -6,7 +6,7 @@ from .cleaner import run_nuke
 BANNER = """
 ============================================================
          Remove-OfficePlus  |  Office 流氓插件彻底根除器      
-         Open Source: https://github.com/Remove-OfficePlus  
+       https://github.com/HenryYannis/Remove-OfficePlus     
 ============================================================
 """
 
