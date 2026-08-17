@@ -2,6 +2,7 @@ import os
 import sys
 import ctypes
 import threading
+import webbrowser
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from typing import Optional
@@ -9,9 +10,9 @@ from typing import Optional
 from .scanner import run_scan, is_admin, ScanReport
 from .cleaner import run_nuke, elevate
 
-# 尝试启用 Windows 高 DPI 缩放感知
+# 启用 Windows 高 DPI 缩放感知
 try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)  # Per-monitor DPI aware
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
 except Exception:
     try:
         ctypes.windll.user32.SetProcessDPIAware()
@@ -24,11 +25,15 @@ class ModernGUI(tk.Tk):
         super().__init__()
 
         self.title("Remove-OfficePlus | Office 顽固插件彻底根除器")
-        self.geometry("780x620")
-        self.minsize(680, 520)
+        
+        # 默认尺寸与最小尺寸
+        default_w = 880
+        default_h = 680
+        self.geometry(f"{default_w}x{default_h}")
+        self.minsize(720, 540)
 
         # 居中显示
-        self._center_window(780, 620)
+        self._center_window(default_w, default_h)
 
         # 检查管理员权限
         self.is_admin_user = is_admin()
@@ -47,7 +52,6 @@ class ModernGUI(tk.Tk):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
     def _setup_theme(self):
-        # 整体色彩体系
         self.configure(bg="#F3F4F6")
 
         self.style = ttk.Style(self)
@@ -56,76 +60,82 @@ class ModernGUI(tk.Tk):
         except Exception:
             pass
 
-        # 统一字体
+        # 统一字体配置
         self.default_font = ("Microsoft YaHei UI", 10)
-        self.title_font = ("Microsoft YaHei UI", 14, "bold")
         self.sub_font = ("Microsoft YaHei UI", 9)
-        self.log_font = ("Consolas", 9)
+        self.log_font = ("Consolas", 10)
 
-        # 样式定制
+        # 样式定义
         self.style.configure("TFrame", background="#F3F4F6")
         self.style.configure("Card.TFrame", background="#FFFFFF", relief="flat")
-        self.style.configure("Header.TLabel", background="#FFFFFF", font=self.title_font, foreground="#111827")
-        self.style.configure("SubHeader.TLabel", background="#FFFFFF", font=self.sub_font, foreground="#6B7280")
-        self.style.configure("CardTitle.TLabel", background="#FFFFFF", font=("Microsoft YaHei UI", 10, "bold"), foreground="#374151")
+        self.style.configure("CardTitle.TLabel", background="#FFFFFF", font=("Microsoft YaHei UI", 9), foreground="#6B7280")
         self.style.configure("CardValue.TLabel", background="#FFFFFF", font=("Microsoft YaHei UI", 16, "bold"), foreground="#2563EB")
-        self.style.configure("Status.TLabel", background="#F3F4F6", font=self.sub_font, foreground="#4B5563")
+        self.style.configure("Status.TLabel", background="#F3F4F6", font=("Microsoft YaHei UI", 9), foreground="#4B5563")
+
+    def _open_website(self, event=None):
+        webbrowser.open_new_tab("https://xbkjz.cn")
 
     def _create_widgets(self):
-        # 1. 顶部卡片横幅
-        top_frame = ttk.Frame(self, style="Card.TFrame", padding=(20, 16))
-        top_frame.pack(fill="x", padx=16, pady=(16, 10))
+        # ================= 1. 顶部简介与权限状态栏 =================
+        top_frame = ttk.Frame(self, style="Card.TFrame", padding=(16, 10))
+        top_frame.pack(fill="x", padx=16, pady=(12, 6))
 
-        title_label = ttk.Label(top_frame, text="Remove-OfficePlus", style="Header.TLabel")
-        title_label.pack(anchor="w")
-
-        desc_label = ttk.Label(
+        desc_label = tk.Label(
             top_frame,
-            text="一键彻底根除「微软 OfficePLUS」及关联后台服务、注册表加载项与残留文件，杜绝死灰复燃。",
-            style="SubHeader.TLabel"
+            text="专注彻底根除「微软 OfficePLUS」流氓加载项、常驻后台服务与注册表残留。",
+            bg="#FFFFFF",
+            fg="#374151",
+            font=("Microsoft YaHei UI", 9),
+            anchor="w"
         )
-        desc_label.pack(anchor="w", pady=(4, 0))
+        desc_label.pack(fill="x", anchor="w")
 
         # 权限提示横条
         if not self.is_admin_user:
-            perm_bar = tk.Frame(top_frame, bg="#FEF3C7", padx=12, pady=6)
-            perm_bar.pack(fill="x", pady=(10, 0))
-            perm_label = tk.Label(
-                perm_bar,
-                text="[提示] 当前以普通权限运行，清理服务与系统级注册表需要管理员权限。",
-                bg="#FEF3C7",
-                fg="#92400E",
-                font=self.sub_font
-            )
-            perm_label.pack(side="left")
+            perm_bar = tk.Frame(top_frame, bg="#FEF3C7", padx=12, pady=5, highlightbackground="#FCD34D", highlightthickness=1)
+            perm_bar.pack(fill="x", pady=(8, 0))
+
             elevate_btn = tk.Button(
                 perm_bar,
                 text="点击立即提权",
-                bg="#F59E0B",
+                bg="#D97706",
+                activebackground="#B45309",
                 fg="#FFFFFF",
+                activeforeground="#FFFFFF",
                 font=("Microsoft YaHei UI", 9, "bold"),
                 relief="flat",
-                padx=8,
+                padx=12,
                 pady=2,
                 cursor="hand2",
                 command=self._do_elevate
             )
-            elevate_btn.pack(side="right")
+            elevate_btn.pack(side="right", padx=(8, 0))
+
+            perm_label = tk.Label(
+                perm_bar,
+                text="[提示] 当前以普通权限运行，彻底清理服务与系统级注册表需要管理员权限。",
+                bg="#FEF3C7",
+                fg="#92400E",
+                font=self.sub_font,
+                anchor="w"
+            )
+            perm_label.pack(side="left", fill="x", expand=True)
         else:
-            perm_bar = tk.Frame(top_frame, bg="#DEF7EC", padx=12, pady=4)
-            perm_bar.pack(fill="x", pady=(10, 0))
+            perm_bar = tk.Frame(top_frame, bg="#DEF7EC", padx=12, pady=5, highlightbackground="#A7F3D0", highlightthickness=1)
+            perm_bar.pack(fill="x", pady=(8, 0))
             perm_label = tk.Label(
                 perm_bar,
                 text="[状态] 已获取管理员权限 (Administrator)，具备完整的深度根除清理能力。",
                 bg="#DEF7EC",
                 fg="#03543F",
-                font=self.sub_font
+                font=self.sub_font,
+                anchor="w"
             )
-            perm_label.pack(side="left")
+            perm_label.pack(side="left", fill="x", expand=True)
 
-        # 2. 状态统计卡片区 (4个指标)
+        # ================= 2. 状态统计卡片区 (4个指标) =================
         stats_frame = ttk.Frame(self, style="TFrame")
-        stats_frame.pack(fill="x", padx=16, pady=6)
+        stats_frame.pack(fill="x", padx=16, pady=4)
         stats_frame.columnconfigure((0, 1, 2, 3), weight=1, uniform="col")
 
         self.card_proc_val = self._create_stat_card(stats_frame, 0, "运行进程", "0")
@@ -133,76 +143,112 @@ class ModernGUI(tk.Tk):
         self.card_reg_val = self._create_stat_card(stats_frame, 2, "注册表项", "0")
         self.card_dir_val = self._create_stat_card(stats_frame, 3, "残留目录", "0")
 
-        # 3. 核心控制按钮区
-        btn_frame = ttk.Frame(self, style="TFrame")
-        btn_frame.pack(fill="x", padx=16, pady=10)
+        # ================= 3. 核心控制按钮与状态区 (整体居中对称布局) =================
+        control_container = ttk.Frame(self, style="TFrame")
+        control_container.pack(fill="x", padx=16, pady=8)
+
+        # 居中按钮组
+        buttons_box = ttk.Frame(control_container, style="TFrame")
+        buttons_box.pack(anchor="center")
 
         self.scan_btn = tk.Button(
-            btn_frame,
+            buttons_box,
             text="重新排查扫描",
-            bg="#3B82F6",
+            bg="#2563EB",
+            activebackground="#1D4ED8",
             fg="#FFFFFF",
+            activeforeground="#FFFFFF",
             font=("Microsoft YaHei UI", 10, "bold"),
             relief="flat",
-            padx=16,
+            padx=24,
             pady=8,
             cursor="hand2",
             command=self.start_scan
         )
-        self.scan_btn.pack(side="left", padx=(0, 10))
+        self.scan_btn.pack(side="left", padx=10)
 
         self.nuke_btn = tk.Button(
-            btn_frame,
+            buttons_box,
             text="一键彻底根除",
-            bg="#EF4444",
+            bg="#DC2626",
+            activebackground="#B91C1C",
             fg="#FFFFFF",
+            activeforeground="#FFFFFF",
             font=("Microsoft YaHei UI", 10, "bold"),
             relief="flat",
-            padx=20,
+            padx=28,
             pady=8,
             cursor="hand2",
             command=self.confirm_nuke
         )
-        self.nuke_btn.pack(side="left")
+        self.nuke_btn.pack(side="left", padx=10)
 
-        self.status_label = ttk.Label(btn_frame, text="准备就绪", style="Status.TLabel")
-        self.status_label.pack(side="right", padx=6)
+        # 居中状态显示条
+        self.status_label = ttk.Label(control_container, text="准备就绪", style="Status.TLabel", anchor="center")
+        self.status_label.pack(anchor="center", pady=(6, 0))
 
-        # 4. 日志控制台
-        log_frame = ttk.Frame(self, style="Card.TFrame", padding=10)
-        log_frame.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+        # ================= 4. 底部状态栏 (固定在整个窗口最底部，左下角放置官网链接) =================
+        bottom_bar = ttk.Frame(self, style="TFrame")
+        bottom_bar.pack(side="bottom", fill="x", padx=16, pady=(4, 10))
+
+        # 左下角：官方网站超链接
+        site_link = tk.Label(
+            bottom_bar,
+            text="官方网站: xbkjz.cn",
+            bg="#F3F4F6",
+            fg="#2563EB",
+            font=("Microsoft YaHei UI", 9, "underline"),
+            cursor="hand2"
+        )
+        site_link.pack(side="left")
+        site_link.bind("<Button-1>", self._open_website)
+
+        # 右下角：轻量状态标识
+        version_label = tk.Label(
+            bottom_bar,
+            text="Remove-OfficePlus 开源工具",
+            bg="#F3F4F6",
+            fg="#9CA3AF",
+            font=("Microsoft YaHei UI", 9)
+        )
+        version_label.pack(side="right")
+
+        # ================= 5. 日志控制台 (填充中间剩余全部空间) =================
+        log_frame = ttk.Frame(self, style="Card.TFrame", padding=(14, 10))
+        log_frame.pack(fill="both", expand=True, padx=16, pady=(4, 4))
 
         log_title = ttk.Label(log_frame, text="执行日志与排查详情：", style="CardTitle.TLabel")
-        log_title.pack(anchor="w", pady=(0, 6))
+        log_title.pack(anchor="w", pady=(0, 4))
 
         self.log_text = scrolledtext.ScrolledText(
             log_frame,
             wrap=tk.WORD,
-            bg="#1E1E1E",
-            fg="#D4D4D4",
+            bg="#18181B",
+            fg="#E4E4E7",
             insertbackground="#FFFFFF",
             font=self.log_font,
             relief="flat",
-            height=12
+            padx=10,
+            pady=8
         )
         self.log_text.pack(fill="both", expand=True)
 
         # 配置日志颜色标签
-        self.log_text.tag_config("info", foreground="#9CDCFE")
-        self.log_text.tag_config("success", foreground="#4EC9B0")
-        self.log_text.tag_config("warn", foreground="#CE9178")
-        self.log_text.tag_config("danger", foreground="#F44747")
-        self.log_text.tag_config("muted", foreground="#808080")
+        self.log_text.tag_config("info", foreground="#60A5FA")
+        self.log_text.tag_config("success", foreground="#34D399")
+        self.log_text.tag_config("warn", foreground="#FBBF24")
+        self.log_text.tag_config("danger", foreground="#F87171")
+        self.log_text.tag_config("muted", foreground="#71717A")
 
     def _create_stat_card(self, parent, col: int, title: str, init_val: str):
-        card = tk.Frame(parent, bg="#FFFFFF", padx=12, pady=10, relief="flat", highlightbackground="#E5E7EB", highlightthickness=1)
+        card = tk.Frame(parent, bg="#FFFFFF", padx=14, pady=8, relief="flat", highlightbackground="#E5E7EB", highlightthickness=1)
         card.grid(row=0, column=col, padx=4, sticky="nsew")
 
         lbl_title = tk.Label(card, text=title, bg="#FFFFFF", fg="#6B7280", font=self.sub_font)
         lbl_title.pack(anchor="w")
 
-        lbl_val = tk.Label(card, text=init_val, bg="#FFFFFF", fg="#1F2937", font=("Microsoft YaHei UI", 15, "bold"))
-        lbl_val.pack(anchor="w", pady=(2, 0))
+        lbl_val = tk.Label(card, text=init_val, bg="#FFFFFF", fg="#1F2937", font=("Microsoft YaHei UI", 16, "bold"))
+        lbl_val.pack(anchor="w", pady=(1, 0))
         return lbl_val
 
     def log(self, message: str, tag: str = "info"):

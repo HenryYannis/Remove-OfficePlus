@@ -136,6 +136,12 @@ Remove-OfficePlus/
 
 ---
 
+## 官方网站
+
+- 官网：[xbkjz.cn](https://xbkjz.cn)
+
+---
+
 ## 开源协议
 
 本项目采用 [MIT License](LICENSE) 开源协议。
