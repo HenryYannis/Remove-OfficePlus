@@ -55,11 +55,23 @@ def display_scan(report):
 
 def main():
     parser = argparse.ArgumentParser(description="Remove-OfficePlus: 一键彻底根除微软OfficePLUS及同类流氓加载项")
+    parser.add_argument("--gui", action="store_true", help="启动图形界面桌面窗口 (默认)")
+    parser.add_argument("--cli", action="store_true", help="使用命令行交互模式")
     parser.add_argument("--scan", action="store_true", help="仅扫描诊断系统残留，不进行任何修改")
     parser.add_argument("--nuke", action="store_true", help="执行彻底根除清理")
     parser.add_argument("-f", "--force", action="store_true", help="跳过交互确认直接执行清理")
 
     args = parser.parse_args()
+
+    # 如果指定了 --gui 或者没有指定任何命令行操作参数，默认启动 GUI 窗口
+    if args.gui or (not args.cli and not args.scan and not args.nuke and not args.force):
+        try:
+            from .gui import launch_gui
+            launch_gui()
+            return
+        except Exception as e:
+            print(f"启动图形界面失败 ({e})，将回退至命令行模式。\n")
+
     print_banner()
 
     if args.scan:

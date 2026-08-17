@@ -18,6 +18,7 @@ classifiers = [
 
 [project.scripts]
 remove-officeplus = "remove_officeplus.cli:main"
+remove-officeplus-gui = "remove_officeplus.gui:launch_gui"
 
 [tool.setuptools.packages.find]
 where = ["src"]

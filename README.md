@@ -32,16 +32,24 @@
 ## 核心特性
 
 - **彻底根除**：进程 ➔ 服务 ➔ 注册表（HKLM / HKCU / 32 位兼容层）➔ 计划任务 ➔ 缓存目录全链路拔除。
-- **零依赖运行**：核心引擎基于原生 PowerShell 编写，任何 Windows 10 / 11 电脑无需安装额外环境即可直接运行。
-- **双模支持**：提供 PowerShell 极速版与 Python 模块化版。
-- **自动提权**：自动检测管理员权限并触发 UAC 提权，无需复杂操作。
+- **桌面图形界面**：提供现代化原生 GUI 窗口，排查状态、威胁卡片与清理日志一目了然。
+- **零依赖运行**：核心引擎基于原生 PowerShell 与独立绿色版编译，任何 Windows 10 / 11 电脑无需安装环境即可直接运行。
+- **自动提权**：自动检测管理员权限并触发 UAC 提权，无需手动右键复杂操作。
 - **诊断排查模式**：支持仅扫描诊断（`-Scan` / `--scan`），清晰列出系统中的威胁组件。
 
 ---
 
 ## 快速使用方法
 
-### 方式 1：PowerShell 一键在线运行（推荐）
+### 方式 1：下载独立绿色版程序（小白推荐）
+
+1. 前往 GitHub 的 [Releases 页面](https://github.com/HenryYannis/Remove-OfficePlus/releases) 下载最新版的 `Remove-OfficePlus-GUI.exe`。
+2. 双击运行程序，在弹出的 UAC 提示中点击「是」授权管理员权限。
+3. 点击「一键彻底根除」即可全自动完成深度清理与复检。
+
+---
+
+### 方式 2：PowerShell 一键在线运行（极速免下载）
 
 无需下载任何文件，直接在 Windows 桌面按快捷键 `Win + X` 打开「终端」或「PowerShell」，粘贴并运行以下命令：
 
@@ -52,23 +60,26 @@ irm https://raw.githubusercontent.com/HenryYannis/Remove-OfficePlus/main/scripts
 
 ---
 
-### 方式 2：本地双击运行（离线推荐）
+### 方式 3：本地双击脚本运行（源码离线推荐）
 
-1. 下载本仓库源码或 Release 压缩包。
+1. 下载本仓库源码压缩包并解压。
 2. 双击运行根目录下的 `Quick-Remove.bat`。
-3. 在弹出的 UAC 管理员提权窗口点击「是」即可完成全自动清理与复检。
+3. 在弹出的 UAC 管理员提权窗口点击「是」即可全自动清理。
 
 ---
 
-### 方式 3：Python 命令行运行
+### 方式 4：Python 命令行与源码运行
 
 如果你已安装 Python 3.8+ 环境：
 
 ```bash
-# 仅扫描诊断
+# 启动图形桌面窗口 (默认)
+python main.py
+
+# 仅命令行扫描诊断
 python main.py --scan
 
-# 执行彻底根除
+# 命令行执行彻底根除
 python main.py --nuke
 ```
 
@@ -93,16 +104,23 @@ python main.py --nuke
 
 ```
 Remove-OfficePlus/
+├── .github/
+│   ├── ISSUE_TEMPLATE/        # Issue 模板
+│   └── workflows/
+│       ├── ci.yml             # CI 测试与语法校验
+│       └── release.yml        # GitHub Release 自动打包发布 exe 工作流
 ├── scripts/
 │   └── Remove-OfficePlus.ps1   # 原生 PowerShell 核心引擎（零依赖）
 ├── src/
-│   └── remove_officeplus/      # Python 模块化引擎（支持扩展）
+│   └── remove_officeplus/      # Python 核心模块
 │       ├── __init__.py
 │       ├── __main__.py
 │       ├── cli.py              # CLI 命令行入口
 │       ├── cleaner.py          # 核心清理实现
 │       ├── constants.py        # 目标路径与特征定义
+│       ├── gui.py              # 现代图形化桌面窗口
 │       └── scanner.py          # 诊断与扫描模块
+├── build_exe.py                # 单文件绿色版 exe 打包脚本
 ├── Quick-Remove.bat            # Windows 双击快速启动脚本
 ├── main.py                     # Python 快速启动入口
 ├── pyproject.toml              # Python 包构建配置
