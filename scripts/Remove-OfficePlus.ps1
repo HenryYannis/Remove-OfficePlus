@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    OfficePLUS-Nuker: 一键彻底根除“微软OfficePLUS”及同类顽固 Office 加载项。
+    Remove-OfficePlus: 一键彻底根除“微软OfficePLUS”及同类顽固 Office 加载项。
 
 .DESCRIPTION
     本脚本用于扫描、诊断并彻底清除“微软OfficePLUS”插件。
@@ -19,8 +19,8 @@
     跳过交互确认提示，直接执行。
 
 .EXAMPLE
-    .\OfficePLUS-Nuker.ps1 -Scan
-    .\OfficePLUS-Nuker.ps1 -Nuke
+    .\Remove-OfficePlus.ps1 -Scan
+    .\Remove-OfficePlus.ps1 -Nuke
 #>
 
 [CmdletBinding(DefaultParameterSetName = "Default")]
@@ -122,8 +122,8 @@ $TargetDirectories = @(
 function Show-Banner {
     Clear-Host
     Write-Host "============================================================" -ForegroundColor Cyan
-    Write-Host "         OfficePLUS-Nuker  |  Office 流氓插件彻底根除器      " -ForegroundColor Yellow
-    Write-Host "         Open Source: https://github.com/OfficePLUS-Nuker   " -ForegroundColor DarkGray
+    Write-Host "         Remove-OfficePlus  |  Office 流氓插件彻底根除器     " -ForegroundColor Yellow
+    Write-Host "         Open Source: https://github.com/Remove-OfficePlus  " -ForegroundColor DarkGray
     Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host ""
 }

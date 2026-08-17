@@ -1,4 +1,4 @@
-# 🧹 OfficePLUS-Nuker
+# 🧹 Remove-OfficePlus
 
 <p align="center">
   <b>一键彻底根除“微软OfficePLUS”及同类顽固流氓 Office 加载项，彻底杜绝后台常驻与死灰复燃！</b><br>
@@ -47,7 +47,7 @@
 
 ```powershell
 # 运行极速排查与彻底清理
-irm https://raw.githubusercontent.com/HenryYannis/OfficePLUS-Nuker/main/scripts/OfficePLUS-Nuker.ps1 | iex
+irm https://raw.githubusercontent.com/HenryYannis/Remove-OfficePlus/main/scripts/Remove-OfficePlus.ps1 | iex
 ```
 
 ---
@@ -55,7 +55,7 @@ irm https://raw.githubusercontent.com/HenryYannis/OfficePLUS-Nuker/main/scripts/
 ### 方式 2：本地双击运行（离线推荐）
 
 1. 下载本仓库或 Release 压缩包；
-2. 双击运行根目录下的 **`Quick-Nuke.bat`**；
+2. 双击运行根目录下的 **`Quick-Remove.bat`**；
 3. 在弹出的 UAC 管理员提权窗口点击 **【是】** 即可完成全自动清理与复检。
 
 ---
@@ -92,18 +92,18 @@ python main.py --nuke
 ## 📂 项目结构
 
 ```
-OfficePLUS-Nuker/
+Remove-OfficePlus/
 ├── scripts/
-│   └── OfficePLUS-Nuker.ps1    # 原生 PowerShell 核心引擎 (零依赖)
+│   └── Remove-OfficePlus.ps1   # 原生 PowerShell 核心引擎 (零依赖)
 ├── src/
-│   └── officeplus_nuker/       # Python 模块化引擎 (支持扩展)
+│   └── remove_officeplus/      # Python 模块化引擎 (支持扩展)
 │       ├── __init__.py
 │       ├── __main__.py
 │       ├── cli.py              # CLI 命令行入口
 │       ├── cleaner.py          # 核心清理实现
 │       ├── constants.py        # 目标路径与特征定义
 │       └── scanner.py          # 诊断与扫描模块
-├── Quick-Nuke.bat              # Windows 双击快速启动脚本
+├── Quick-Remove.bat            # Windows 双击快速启动脚本
 ├── main.py                     # Python 快速启动入口
 ├── pyproject.toml              # Python 包构建配置
 ├── README.md                   # 项目说明

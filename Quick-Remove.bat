@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title OfficePLUS-Nuker
+title Remove-OfficePlus
 
 :: Check for administrative permissions
 net session >nul 2>&1
@@ -11,5 +11,5 @@ if %errorlevel% neq 0 (
 )
 
 :: Run core powershell script
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\OfficePLUS-Nuker.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\Remove-OfficePlus.ps1"
 pause

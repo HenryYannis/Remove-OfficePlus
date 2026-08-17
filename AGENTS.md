@@ -1,4 +1,4 @@
-# AGENTS.md — OfficePLUS-Nuker
+# AGENTS.md — Remove-OfficePlus
 
 本项目用于全面检测、彻底清除顽固的“微软OfficePLUS”及同类流氓 Office 加载项，杜绝其后台服务常驻及自动复活。
 
@@ -6,9 +6,9 @@
 
 - **定位**：轻量、开源、安全、零依赖的 Windows Office 顽固插件彻底根除工具。
 - **双模设计**：
-  1. **PowerShell Core (`scripts/OfficePLUS-Nuker.ps1`)**：零依赖的原生 PowerShell 核心引擎，支持无 Python 环境下的开箱即用与单行网页直接运行。
-  2. **Python CLI/GUI (`src/officeplus_nuker/`)**：面向对象封装，提供交互式命令行与后续轻量桌面 GUI 扩展能力。
-- **启动器 (`Quick-Nuke.bat`)**：提供双击直接触发 UAC 管理员提权运行的便携方式。
+  1. **PowerShell Core (`scripts/Remove-OfficePlus.ps1`)**：零依赖的原生 PowerShell 核心引擎，支持无 Python 环境下的开箱即用与单行网页直接运行。
+  2. **Python CLI/GUI (`src/remove_officeplus/`)**：面向对象封装，提供交互式命令行与后续轻量桌面 GUI 扩展能力。
+- **启动器 (`Quick-Remove.bat`)**：提供双击直接触发 UAC 管理员提权运行的便携方式。
 
 ## 核心规范
 

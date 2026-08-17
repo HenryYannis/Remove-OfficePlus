@@ -5,8 +5,8 @@ from .cleaner import run_nuke
 
 BANNER = """
 ============================================================
-         OfficePLUS-Nuker  |  Office 流氓插件彻底根除器      
-         Open Source: https://github.com/OfficePLUS-Nuker   
+         Remove-OfficePlus  |  Office 流氓插件彻底根除器      
+         Open Source: https://github.com/Remove-OfficePlus  
 ============================================================
 """
 
@@ -54,7 +54,7 @@ def display_scan(report):
     print("-" * 60 + "\n")
 
 def main():
-    parser = argparse.ArgumentParser(description="OfficePLUS-Nuker: 一键彻底根除微软OfficePLUS及同类流氓加载项")
+    parser = argparse.ArgumentParser(description="Remove-OfficePlus: 一键彻底根除微软OfficePLUS及同类流氓加载项")
     parser.add_argument("--scan", action="store_true", help="仅扫描诊断系统残留，不进行任何修改")
     parser.add_argument("--nuke", action="store_true", help="执行彻底根除清理")
     parser.add_argument("-f", "--force", action="store_true", help="跳过交互确认直接执行清理")
