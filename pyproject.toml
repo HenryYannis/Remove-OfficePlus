@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "officeplus-nuker"
+version = "1.0.0"
+description = "一键彻底根除微软OfficePLUS及同类顽固流氓加载项"
+readme = "README.md"
+authors = [{ name = "OfficePLUS-Nuker Contributors" }]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.scripts]
+officeplus-nuker = "officeplus_nuker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
