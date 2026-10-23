@@ -43,6 +43,10 @@ jobs:
         run: python tests/real_sample_check.py
         env:
           PYTHONUTF8: "1"
+      - name: 图形界面如实提示清理结果
+        run: python tests/gui_result_check.py
+        env:
+          PYTHONUTF8: "1"
       - name: Test Python CLI Syntax & Import
         run: |
           python -m remove_officeplus --scan
