@@ -1,7 +1,7 @@
 # Remove-OfficePlus
 
 <p align="center">
-  <b>一键清除「微软 OfficePLUS」顽固 Office 加载项，删除前自动备份，杜绝后台常驻与死灰复燃。</b><br>
+  <b>一键清理「微软 OfficePLUS」Office 加载项、后台服务和残留文件，删除前自动备份。</b><br>
   <i>Remove the Microsoft OfficePLUS add-in and its background service, with automatic registry backup.</i>
 </p>
 
@@ -15,17 +15,17 @@
 
 ## 为什么需要这个项目
 
-很多用户在不知情或安装其他软件被捆绑时，电脑中被装上了「微软 OfficePLUS」（或称「微软 PPT 助手 / Office 助手」）。
+不少用户发现电脑里多了「微软 OfficePLUS」（也叫「微软 PPT 助手 / Office 助手」），却不记得自己装过。
 
-当你试图卸载它时，通常会遭遇以下流氓对抗机制：
+手动卸载时常见这些问题：
 1. **无法关闭**：在 Word / Excel / PowerPoint 选项中取消勾选插件，重启 Office 后依然被强制勾选加载。
 2. **无法删除**：文件管理器删除提示「文件已被占用」，无法正常删除。
-3. **死灰复燃**：即使用某些工具删除了部分文件，开机后又被后台守护进程自动下载或修复「复活」。
+3. **会重新出现**：即使用某些工具删除了部分文件，开机后又被后台服务自动下载或修复恢复。
 
-### 底层对抗原理分析
-- **系统级服务守护**：常驻运行 `OfficePLUS Service`（`MSOfficePLUSService.exe`），以 `LocalSystem` 最高权限开机自启。
-- **系统全局注册表强载**：在 `HKEY_LOCAL_MACHINE`（而非当前用户 `HKCU`）写入 `LoadBehavior = 3`（随 Office 启动自动加载）。系统级的加载项设置优先于用户在 Office 选项里的勾选，所以取消勾选后重启又会被加载。
-- **多处缓存潜伏**：在 `ProgramData` 与 `AppData` 存有配置文件与更新种子。
+### 为什么取消勾选没用
+- **系统服务**：常驻运行 `OfficePLUS Service`（`MSOfficePLUSService.exe`），以 `LocalSystem` 最高权限开机自启。
+- **系统级注册表加载**：在 `HKEY_LOCAL_MACHINE`（而非当前用户 `HKCU`）写入 `LoadBehavior = 3`（随 Office 启动自动加载）。系统级的加载项设置优先于用户在 Office 选项里的勾选，所以取消勾选后重启又会被加载。
+- **缓存文件**：在 `ProgramData` 与 `AppData` 存有配置文件与更新种子。
 
 ---
 
@@ -39,7 +39,7 @@
 - **自动提权**：需要管理员权限时自动弹出 UAC；用其他管理员账号授权时，清理的仍是当前登录用户的数据。
 - **只看不删**：支持仅扫描（`-Scan` / `--scan`）和预演（`--dry-run`），先看清楚再决定。
 
-目前专门针对 OfficePLUS。如果你遇到了它的新变种或类似的顽固加载项，欢迎提交 Issue。
+目前专门针对 OfficePLUS。如果你遇到了它的新变种或类似的加载项，欢迎提交 Issue。
 
 ---
 
@@ -59,7 +59,7 @@
 
 1. 前往 GitHub 的 [Releases 页面](https://github.com/HenryYannis/Remove-OfficePlus/releases) 下载最新版的 `Remove-OfficePlus-GUI.exe`。
 2. 双击运行程序，在弹出的 UAC 提示中点击「是」授权管理员权限。
-3. 点击「一键彻底根除」即可全自动完成清理与复检。
+3. 点击「一键清理」即可全自动完成清理与复检。
 
 > **Windows 提示「已保护你的电脑」？** exe 没有购买代码签名证书，第一次运行时 SmartScreen 可能拦截。点「更多信息」→「仍要运行」即可。
 >
@@ -102,7 +102,7 @@ python main.py --scan
 # 预演：列出清理时会删除的项目，不做任何修改
 python main.py --dry-run
 
-# 命令行执行彻底根除（会先列出要删的项目并询问确认，加 -f 跳过确认）
+# 命令行执行清理（会先列出要删的项目并询问确认，加 -f 跳过确认）
 python main.py --nuke
 
 # 查看版本号
@@ -214,6 +214,14 @@ Remove-OfficePlus/
 ## 官方网站
 
 - 官网：[xbkjz.cn](https://xbkjz.cn)
+
+---
+
+## 免责声明
+
+本项目是个人开发的免费开源工具，与微软公司及 OfficePLUS 产品无任何关联，也未获其授权或认可。Microsoft、Office、OfficePLUS 是其各自权利人的商标，本项目提到它们只为说明清理对象。
+
+本工具只在你主动操作时，删除你自己电脑上的 OfficePLUS 相关组件，不会影响 Office 本身，删除前会备份注册表。如果你需要 OfficePLUS，可以随时从官方渠道重新安装。使用风险由使用者自行承担。
 
 ---
 
