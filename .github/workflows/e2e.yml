@@ -1,0 +1,65 @@
+name: E2E 清理测试
+
+# 在干净的 Windows 虚拟机上种下假的 OfficePLUS 残留，跑一遍清理，
+# 检查是否删干净、有没有误删。GitHub Actions 的 Windows 机器默认就是管理员权限。
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  python-cli:
+    name: Python 版（GUI/exe 用的同一套清理代码）
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 安装
+        run: pip install -e .
+      - name: 种下假残留
+        run: python tests/e2e/fake_residue.py plant
+      - name: 清理前扫描
+        run: python -m remove_officeplus --scan
+      - name: 执行清理
+        run: python -m remove_officeplus --nuke -f
+      - name: 检查结果
+        run: python tests/e2e/fake_residue.py verify
+      - name: 收尾
+        if: always()
+        run: python tests/e2e/fake_residue.py cleanup
+
+  powershell:
+    name: PowerShell 版（${{ matrix.shell }}）
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # powershell = Windows 自带的 5.1（大多数用户用的就是它）；pwsh = PowerShell 7
+        shell: [ powershell, pwsh ]
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 种下假残留
+        run: python tests/e2e/fake_residue.py plant
+      - name: 执行清理
+        shell: ${{ matrix.shell }}
+        run: |
+          & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\scripts\Remove-OfficePlus.ps1 -Nuke
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: 检查结果
+        run: python tests/e2e/fake_residue.py verify
+      - name: 收尾
+        if: always()
+        run: python tests/e2e/fake_residue.py cleanup
