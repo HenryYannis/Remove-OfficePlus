@@ -253,6 +253,22 @@ function Invoke-OfficePlusNuke {
 
     Write-Step "准备执行彻底根除清理..."
 
+    # 提醒用户先保存正在编辑的 Office 文档（-Force 时跳过）
+    if (-not $Force) {
+        $openOffice = Get-Process -Name "WINWORD", "EXCEL", "POWERPNT", "OUTLOOK" -ErrorAction SilentlyContinue
+        if ($openOffice) {
+            $names = ($openOffice | Select-Object -ExpandProperty Name -Unique) -join "、"
+            Write-Warn "检测到以下 Office 程序正在运行：$names"
+            Write-Warn "清理时会强制关闭它们，未保存的内容会丢失。请先保存好文件。"
+            Write-Host "保存好后按回车继续，输入 N 取消: " -NoNewline -ForegroundColor Yellow
+            $answer = [Console]::ReadLine()
+            if ($answer -match "^[Nn]") {
+                Write-Host "操作已取消。" -ForegroundColor Gray
+                return
+            }
+        }
+    }
+
     # 注册表备份
     if (-not $NoBackup) {
         $backupDir = if ($PSScriptRoot) { "$PSScriptRoot\..\backup_regs" } else { "$env:TEMP\OfficePLUS_backup_regs" }

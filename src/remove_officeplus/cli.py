@@ -10,6 +10,22 @@ BANNER = """
 ============================================================
 """
 
+# 清理时会被强制关闭的 Office 程序，运行前需要提醒用户先保存文件
+OFFICE_APPS = ("WINWORD.EXE", "EXCEL.EXE", "POWERPNT.EXE", "OUTLOOK.EXE")
+
+def confirm_office_saved(report) -> bool:
+    """检测到 Office 正在运行时提醒用户先保存文件。返回 False 表示用户取消。"""
+    running = sorted({p.split(" ")[0] for p in report.processes if p.split(" ")[0].upper() in OFFICE_APPS})
+    if not running:
+        return True
+    print(f"[!] 检测到以下 Office 程序正在运行：{'、'.join(running)}")
+    print("[!] 清理时会强制关闭它们，未保存的内容会丢失。请先保存好文件。")
+    choice = input("保存好后按回车继续，输入 n 取消: ").strip().lower()
+    if choice.startswith("n"):
+        print("操作已取消。")
+        return False
+    return True
+
 def print_banner():
     print(BANNER)
 
@@ -91,6 +107,8 @@ def main():
         return
 
     if args.nuke:
+        if not args.force and not confirm_office_saved(run_scan()):
+            return
         print(">>> 正在执行彻底根除清理...")
         procs, svcs, regs, tasks, dirs = run_nuke()
         print("\n" + "=" * 60)
@@ -114,6 +132,8 @@ def main():
         choice = input("是否立即执行彻底清理根除？(y/N): ").strip()
         if choice.lower() != 'y':
             print("操作已取消。")
+            return
+        if not confirm_office_saved(report):
             return
 
     print("\n>>> 正在执行彻底根除清理...")
