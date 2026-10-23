@@ -54,7 +54,6 @@ jobs:
       - name: 种下假残留
         run: python tests/e2e/fake_residue.py plant
       - name: 执行清理
-        shell: ${{ matrix.shell }}
         run: |
           & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\scripts\Remove-OfficePlus.ps1 -Nuke
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
