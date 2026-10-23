@@ -171,6 +171,97 @@ def backup_check():
     print(f"✅ 备份可用：{len(TARGET_REGISTRY_KEYS)} 项注册表（含子键和值）全部恢复。")
 
 
+def block_backup():
+    """在备份文件夹的位置放一个同名文件，让备份文件夹建不起来，模拟备份写入失败。"""
+    import shutil
+    from remove_officeplus.backup import get_backup_dir
+    d = get_backup_dir()
+    if os.path.isdir(d):
+        shutil.rmtree(d)
+    with open(d, "w") as fh:
+        fh.write("block")
+    print(f"已堵住备份文件夹: {d}")
+
+
+def unblock_backup():
+    from remove_officeplus.backup import get_backup_dir
+    if os.path.isfile(get_backup_dir()):
+        os.remove(get_backup_dir())
+
+
+def registry_kept():
+    """备份写不进去时，注册表项一个都不能删。"""
+    gone = [f"{h}\\{p}" for p, h in TARGET_REGISTRY_KEYS if not key_exists(h, p + r"\Sub\Deeper")]
+    if gone:
+        print("[FAIL] 没有备份却删掉了这些注册表项：", *gone, sep="\n  ")
+        sys.exit(1)
+    print(f"[OK] 备份失败时 {len(TARGET_REGISTRY_KEYS)} 项注册表全部保留")
+
+
+PLACEHOLDER = "PLACEHOLDER - must not be overwritten"
+
+
+def occupy_names():
+    """预先占用接下来 2 分钟内每一秒的备份文件名，模拟同一秒内已有备份。"""
+    import datetime
+    import glob
+    from remove_officeplus.backup import get_backup_dir
+    d = get_backup_dir()
+    os.makedirs(d, exist_ok=True)
+    for old in glob.glob(os.path.join(d, "*.reg")):
+        os.remove(old)
+    now = datetime.datetime.now()
+    for s in range(-2, 120):
+        t = now + datetime.timedelta(seconds=s)
+        with open(os.path.join(d, f"OfficePLUS_注册表备份_{t:%Y%m%d_%H%M%S}.reg"), "w") as fh:
+            fh.write(PLACEHOLDER)
+
+
+def names_check():
+    """已有的备份不能被覆盖；新备份换了名字且内容完整；恢复说明存在。"""
+    import glob
+    from remove_officeplus.backup import get_backup_dir, RESTORE_NOTE_NAME
+    d = get_backup_dir()
+    files = glob.glob(os.path.join(d, "*.reg"))
+    overwritten, new = [], []
+    for path in files:
+        with open(path, "rb") as fh:
+            data = fh.read()
+        if data == PLACEHOLDER.encode():
+            continue
+        if os.path.basename(path)[:-4].count("_") == 3:  # 没有 _2 这样的后缀，说明占用了已有的名字
+            overwritten.append(path)
+        new.append((path, data))
+    ok = True
+    if overwritten:
+        print("[FAIL] 覆盖了已有的备份文件：", *overwritten, sep="\n  ")
+        ok = False
+    if len(new) != 1:
+        print(f"[FAIL] 应该新生成 1 个备份文件，实际 {len(new)} 个")
+        ok = False
+    else:
+        text = new[0][1].decode("utf-16")
+        if "Windows Registry Editor Version 5.00" not in text or "MSOfficePLUS" not in text:
+            print(f"[FAIL] 新备份文件内容不完整: {new[0][0]}")
+            ok = False
+        else:
+            print(f"[OK] 新备份换了名字: {os.path.basename(new[0][0])}")
+    note = os.path.join(d, RESTORE_NOTE_NAME)
+    if not os.path.isfile(note):
+        print(f"[FAIL] 备份文件夹里没有恢复说明 {RESTORE_NOTE_NAME}")
+        ok = False
+    else:
+        with open(note, encoding="utf-8-sig") as fh:
+            if "双击" not in fh.read():
+                print("[FAIL] 恢复说明内容不对")
+                ok = False
+    for path in files:
+        os.remove(path)
+    if not ok:
+        sys.exit(1)
+    print("[OK] 已有备份没被覆盖，恢复说明已生成")
+
+
 def plant():
     for path, hive in TARGET_REGISTRY_KEYS:
         create_key(hive, path)
@@ -260,4 +351,6 @@ if __name__ == "__main__":
         "office-scan": office_scan, "office-start": office_start, "office-stop": office_stop,
         "lock-start": lock_start, "lock-stop": lock_stop, "backup-check": backup_check,
         "scan-check": scan_check,
+        "block-backup": block_backup, "unblock-backup": unblock_backup,
+        "registry-kept": registry_kept, "occupy-names": occupy_names, "names-check": names_check,
     }.get(action, lambda: sys.exit(__doc__))()

@@ -62,6 +62,17 @@ jobs:
           python tests/e2e/fake_residue.py plant
           python tests/e2e/elevation_relaunch.py main-py
           python tests/e2e/fake_residue.py verify
+      - name: 备份写不进去时不删注册表；已有备份不被覆盖
+        run: |
+          python tests/e2e/fake_residue.py plant
+          python tests/e2e/fake_residue.py block-backup
+          python -m remove_officeplus --nuke -f
+          python tests/e2e/fake_residue.py registry-kept
+          python tests/e2e/fake_residue.py unblock-backup
+          python tests/e2e/fake_residue.py occupy-names
+          python -m remove_officeplus --nuke -f
+          python tests/e2e/fake_residue.py verify
+          python tests/e2e/fake_residue.py names-check
       - name: 收尾
         if: always()
         run: |
@@ -139,6 +150,17 @@ jobs:
           # 模拟用户：确认清理输入 Y，后面几次回车应付“按任意键”
           "Y`r`n`r`n`r`n" | cmd /c Quick-Remove.bat
           python tests/e2e/fake_residue.py verify
+      - name: 备份写不进去时不删注册表；已有备份不被覆盖
+        run: |
+          python tests/e2e/fake_residue.py plant
+          python tests/e2e/fake_residue.py block-backup
+          & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\scripts\Remove-OfficePlus.ps1 -Nuke
+          python tests/e2e/fake_residue.py registry-kept
+          python tests/e2e/fake_residue.py unblock-backup
+          python tests/e2e/fake_residue.py occupy-names
+          & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\scripts\Remove-OfficePlus.ps1 -Nuke
+          python tests/e2e/fake_residue.py verify
+          python tests/e2e/fake_residue.py names-check
       - name: 收尾
         if: always()
         run: |
