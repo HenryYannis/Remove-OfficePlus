@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Remove-OfficePlus: 一键彻底根除「微软 OfficePLUS」及同类顽固 Office 加载项。
 
