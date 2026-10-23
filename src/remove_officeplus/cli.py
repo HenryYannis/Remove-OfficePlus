@@ -53,7 +53,18 @@ def display_scan(report):
         print("[+] 排查完成：你的系统干干净净，未发现任何 OfficePLUS 残留！")
     print("-" * 60 + "\n")
 
+def _safe_console_output():
+    """输出被重定向到文件/管道且编码不支持中文时（例如英文 Windows 的 cp1252），
+    用 ? 代替无法显示的字符，避免整个程序因 UnicodeEncodeError 崩溃。"""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except Exception:
+                pass
+
 def main():
+    _safe_console_output()
     parser = argparse.ArgumentParser(description="Remove-OfficePlus: 一键彻底根除微软OfficePLUS及同类流氓加载项")
     parser.add_argument("--gui", action="store_true", help="启动图形界面桌面窗口 (默认)")
     parser.add_argument("--cli", action="store_true", help="使用命令行交互模式")
