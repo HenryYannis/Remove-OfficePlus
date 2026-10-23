@@ -117,6 +117,14 @@ jobs:
           if ($out -match "WINWORD") { Write-Error "把正常运行的 Word 当成了威胁"; exit 1 }
       - name: 种下假残留
         run: python tests/e2e/fake_residue.py plant
+      - name: 一键命令（irm | iex）结束后不能关掉用户的 PowerShell 窗口
+        run: |
+          # 模拟用户在自己的窗口里 irm | iex，回答 N 取消；脚本结束后，后面的命令必须还能继续执行
+          $src = (Resolve-Path .\scripts\Remove-OfficePlus.ps1).Path
+          $out = "N" | & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -Command "& { Invoke-Expression ([IO.File]::ReadAllText('$src')); 'STILL-ALIVE' }" | Out-String
+          $out
+          if ($out -notmatch "STILL-ALIVE") { Write-Error "脚本结束时把调用它的 PowerShell 一起关掉了"; exit 1 }
+          python tests/e2e/fake_residue.py scan-check
       - name: 执行清理
         run: |
           & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\scripts\Remove-OfficePlus.ps1 -Nuke
