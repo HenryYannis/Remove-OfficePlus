@@ -6,6 +6,9 @@
     python tests/e2e/fake_residue.py plant    # 种下假残留和“哨兵”（不应被删除的对照项）
     python tests/e2e/fake_residue.py verify   # 检查假残留是否全部清除、哨兵是否完好
     python tests/e2e/fake_residue.py cleanup  # 清掉哨兵等测试遗留
+    python tests/e2e/fake_residue.py office-scan   # 正常运行的 Word 不应被扫描当成威胁（Python 版）
+    python tests/e2e/fake_residue.py office-start  # 启动一个假的 WINWORD.EXE（给 PowerShell 版测试用）
+    python tests/e2e/fake_residue.py office-stop
 
 注意：假残留的位置取自 constants.py，只能验证“删除逻辑是否可靠”，
 不能证明这些路径就是真实 OfficePLUS 的安装位置。
@@ -75,6 +78,46 @@ def process_running(name):
     return name.lower() in out.lower()
 
 
+def start_fake(name, minutes=60):
+    """把 ping.exe 复制成指定名字并后台运行，模拟一个进程。"""
+    fake_exe = os.path.join(tempfile.mkdtemp(), name)
+    with open(r"C:\Windows\System32\PING.EXE", "rb") as src, open(fake_exe, "wb") as dst:
+        dst.write(src.read())
+    subprocess.Popen([fake_exe, "-n", str(minutes * 60), "127.0.0.1"],
+                     stdout=subprocess.DEVNULL, creationflags=0x08000000 | 0x00000008)
+    time.sleep(1)
+    if not process_running(name):
+        sys.exit(f"假进程 {name} 启动失败")
+
+
+def office_start():
+    start_fake("WINWORD.EXE")
+
+
+def office_stop():
+    run(["taskkill", "/F", "/IM", "WINWORD.EXE"])
+
+
+def office_scan():
+    from remove_officeplus.scanner import run_scan
+    office_start()
+    try:
+        report = run_scan()
+    finally:
+        office_stop()
+    errors = []
+    if any("WINWORD" in p.upper() for p in report.processes):
+        errors.append(f"把正常运行的 Word 当成了威胁：{report.processes}")
+    if not any("WINWORD" in p.upper() for p in report.office_apps):
+        errors.append("没检测到正在运行的 Word，清理前就不会提醒用户保存文件")
+    if not report.is_clean:
+        errors.append(f"干净的系统只开着 Word，却报告有 {report.total_threats} 处威胁")
+    if errors:
+        print("❌", *errors, sep="\n  ")
+        sys.exit(1)
+    print("✅ 正常运行的 Word 没被当成威胁，且能被识别出来用于保存提醒。")
+
+
 def plant():
     for path, hive in TARGET_REGISTRY_KEYS:
         create_key(hive, path)
@@ -92,12 +135,7 @@ def plant():
     for t in FAKE_TASKS + [SENTINEL_TASK]:
         r = run(["schtasks", "/Create", "/TN", t, "/TR", "cmd /c exit", "/SC", "ONCE", "/ST", "23:59", "/F"])
         print(f"create task {t}: {r.returncode}")
-    # 假进程：把 ping.exe 复制成 OfficePLUS.exe 跑一小时
-    fake_exe = os.path.join(tempfile.gettempdir(), FAKE_PROCESS_NAME)
-    with open(r"C:\Windows\System32\PING.EXE", "rb") as src, open(fake_exe, "wb") as dst:
-        dst.write(src.read())
-    subprocess.Popen([fake_exe, "-n", "3600", "127.0.0.1"], stdout=subprocess.DEVNULL, creationflags=0x08000000)
-    time.sleep(1)
+    start_fake(FAKE_PROCESS_NAME)
     # 哨兵
     create_key(SENTINEL_KEY[0], SENTINEL_KEY[1], with_children=False)
     os.makedirs(SENTINEL_DIR, exist_ok=True)
@@ -152,4 +190,7 @@ def cleanup():
 
 if __name__ == "__main__":
     action = sys.argv[1] if len(sys.argv) > 1 else ""
-    {"plant": plant, "verify": verify, "cleanup": cleanup}.get(action, lambda: sys.exit(__doc__))()
+    {
+        "plant": plant, "verify": verify, "cleanup": cleanup,
+        "office-scan": office_scan, "office-start": office_start, "office-stop": office_stop,
+    }.get(action, lambda: sys.exit(__doc__))()
