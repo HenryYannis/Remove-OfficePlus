@@ -47,23 +47,30 @@ function Test-IsAdmin {
     return $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+# 必须在脚本顶层取路径：在函数里用 $MyInvocation 拿到的是函数本身，
+# 会被误判成在线模式而去 GitHub 重新下载 main 分支的脚本。
+$ScriptPath = $PSCommandPath
+
+function Get-ElevationArguments {
+    # 本地文件运行：用管理员身份重新执行当前这份脚本，并保留原参数
+    if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
+        $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
+        if ($Scan) { $argList += " -Scan" }
+        if ($Nuke) { $argList += " -Nuke" }
+        if ($NoBackup) { $argList += " -NoBackup" }
+        if ($Force) { $argList += " -Force" }
+    } else {
+        # irm | iex 在线运行时没有本地文件，只能重新拉取同一个地址
+        $onlineCmd = "irm https://raw.githubusercontent.com/HenryYannis/Remove-OfficePlus/main/scripts/Remove-OfficePlus.ps1 | iex"
+        $argList = "-NoProfile -ExecutionPolicy Bypass -Command `"$onlineCmd`""
+    }
+    return $argList
+}
+
 function Elevate-Privileges {
     if (-not (Test-IsAdmin)) {
         Write-Host "`n[!] 检测到当前非管理员权限，正在请求 UAC 管理员提权..." -ForegroundColor Yellow
-        $scriptPath = $MyInvocation.MyCommand.Definition
-        
-        # 判断是否为本地文件运行还是 irm 在线管道运行
-        if ($scriptPath -and (Test-Path $scriptPath)) {
-            $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
-            if ($Scan) { $argList += " -Scan" }
-            if ($Nuke) { $argList += " -Nuke" }
-            if ($NoBackup) { $argList += " -NoBackup" }
-            if ($Force) { $argList += " -Force" }
-        } else {
-            # 在线 Web 执行模式下的提权
-            $onlineCmd = "irm https://raw.githubusercontent.com/HenryYannis/Remove-OfficePlus/main/scripts/Remove-OfficePlus.ps1 | iex"
-            $argList = "-NoProfile -ExecutionPolicy Bypass -Command `"$onlineCmd`""
-        }
+        $argList = Get-ElevationArguments
 
         try {
             Start-Process powershell -Verb RunAs -ArgumentList $argList
