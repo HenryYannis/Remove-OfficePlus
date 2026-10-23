@@ -27,6 +27,12 @@ jobs:
           pip install pyinstaller
           pip install -e .
 
+      - name: Check tag matches version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          $v = python -c "import remove_officeplus; print(remove_officeplus.__version__)"
+          if ("${{ github.ref_name }}" -ne "v$v") { Write-Error "标签 ${{ github.ref_name }} 和代码里的版本号 $v 不一致"; exit 1 }
+
       - name: Build Executable
         env:
           PYTHONUTF8: "1"  # 打包脚本会输出中文，英文环境下不设这个会直接崩溃
@@ -37,6 +43,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: dist/Remove-OfficePlus-GUI.exe
+          files: |
+            dist/Remove-OfficePlus-GUI.exe
+            dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
