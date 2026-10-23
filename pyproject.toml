@@ -7,7 +7,7 @@ name = "remove-officeplus"
 version = "1.1.0"
 description = "一键彻底根除微软OfficePLUS及同类顽固流氓加载项"
 readme = "README.md"
-authors = [{ name = "Remove-OfficePlus Contributors" }]
+authors = [{ name = "程小宝 (Cheng Xiaobao)" }]
 license = { text = "MIT" }
 requires-python = ">=3.8"
 classifiers = [
