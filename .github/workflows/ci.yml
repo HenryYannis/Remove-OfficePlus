@@ -64,11 +64,11 @@ jobs:
       - name: 检查 exe 版本信息和校验文件
         run: |
           $v = python -c "import remove_officeplus; print(remove_officeplus.__version__)"
-          $info = (Get-Item dist\Remove-OfficePlus-GUI.exe).VersionInfo
+          $info = (Get-Item "dist\Remove-OfficePlus-GUI-v$v.exe").VersionInfo
           $info | Format-List ProductName, ProductVersion, FileVersion, CompanyName, LegalCopyright
           if ($info.ProductVersion -ne $v) { Write-Error "exe 版本号 $($info.ProductVersion) 和代码 $v 不一致"; exit 1 }
           if ($info.CompanyName -match "Microsoft") { Write-Error "exe 公司信息不能写微软"; exit 1 }
-          $sum = (Get-FileHash dist\Remove-OfficePlus-GUI.exe -Algorithm SHA256).Hash.ToLower()
+          $sum = (Get-FileHash "dist\Remove-OfficePlus-GUI-v$v.exe" -Algorithm SHA256).Hash.ToLower()
           $line = Get-Content dist\SHA256SUMS.txt
           $line
           if ($line -notmatch "^$sum ") { Write-Error "SHA256SUMS.txt 和 exe 不一致"; exit 1 }

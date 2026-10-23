@@ -83,14 +83,19 @@ def build() -> int:
     print(f"执行打包命令: {' '.join(cmd)}")
     subprocess.check_call(cmd)
 
-    exe_path = os.path.join(dist_dir, f"{EXE_NAME}.exe")
-    if not os.path.exists(exe_path):
+    built_path = os.path.join(dist_dir, f"{EXE_NAME}.exe")
+    if not os.path.exists(built_path):
         print("\n[!] 构建失败：未在 dist 目录找到可执行文件。")
         return 1
 
+    # 发布用的文件名带上版本号，方便用户分辨下载的是哪一版
+    release_name = f"{EXE_NAME}-v{__version__}.exe"
+    exe_path = os.path.join(dist_dir, release_name)
+    os.replace(built_path, exe_path)
+
     digest = sha256(exe_path)
     with open(os.path.join(dist_dir, "SHA256SUMS.txt"), "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(f"{digest}  {EXE_NAME}.exe\n")
+        fh.write(f"{digest}  {release_name}\n")
     size_mb = os.path.getsize(exe_path) / (1024 * 1024)
     print(f"\n[+] 构建成功！输出可执行文件: {exe_path} ({size_mb:.2f} MB)")
     print(f"[+] SHA256: {digest}")
