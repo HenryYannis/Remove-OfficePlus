@@ -152,6 +152,7 @@ if ($TargetUser) {
 # ==========================================
 # 1. 目标组件定义
 # ==========================================
+# ---- BEGIN RULES：由 scripts/sync_rules.py 根据 rules.json 生成，请勿手改 ----
 # OfficePLUS 自身的进程：扫描时算作威胁
 $OfficePlusProcesses = @(
     "MSOfficePLUSService",
@@ -175,18 +176,21 @@ $TargetServices = @(
     "OfficePLUS Service"
 )
 
+# 计划任务名或路径里含有这个词就算 OfficePLUS 的
+$TaskKeyword = "OfficePLUS"
+
 $TargetRegistryKeys = @(
     "HKLM:\Software\Microsoft\Office\Word\Addins\MSOfficePLUS",
     "HKLM:\Software\Microsoft\Office\Excel\Addins\MSOfficePLUS",
     "HKLM:\Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS",
     "HKLM:\Software\Microsoft\Office\Outlook\Addins\MSOfficePLUS",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS",
+    "HKLM:\Software\Microsoft\OfficePLUS",
     "HKLM:\Software\Wow6432Node\Microsoft\Office\Word\Addins\MSOfficePLUS",
     "HKLM:\Software\Wow6432Node\Microsoft\Office\Excel\Addins\MSOfficePLUS",
     "HKLM:\Software\Wow6432Node\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS",
     "HKLM:\Software\Wow6432Node\Microsoft\Office\Outlook\Addins\MSOfficePLUS",
-    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS",
     "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS",
-    "HKLM:\Software\Microsoft\OfficePLUS",
     "HKLM:\Software\Wow6432Node\Microsoft\OfficePLUS",
     "$UserRegRoot\Software\Microsoft\Office\Word\Addins\MSOfficePLUS",
     "$UserRegRoot\Software\Microsoft\Office\Excel\Addins\MSOfficePLUS",
@@ -196,15 +200,17 @@ $TargetRegistryKeys = @(
     "$UserRegRoot\Software\Microsoft\OfficePLUS"
 )
 
+# 系统目录取环境变量（系统不一定装在 C 盘）；哪个位置取不到就跳过，不能拼成盘符根目录
 $TargetDirectories = @(
-    "C:\Program Files\Microsoft OfficePLUS",
-    "C:\Program Files (x86)\Microsoft OfficePLUS",
-    "C:\ProgramData\Microsoft OfficePLUS",
-    "$UserLocalAppData\OfficePLUS",
-    "$UserLocalAppData\Microsoft OfficePLUS",
-    "$UserAppData\OfficePLUS",
-    "$UserAppData\Microsoft OfficePLUS"
+    if ($env:ProgramFiles) { Join-Path $env:ProgramFiles "Microsoft OfficePLUS" }
+    if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} "Microsoft OfficePLUS" }
+    if ($env:ProgramData) { Join-Path $env:ProgramData "Microsoft OfficePLUS" }
+    if ($UserLocalAppData) { Join-Path $UserLocalAppData "OfficePLUS" }
+    if ($UserLocalAppData) { Join-Path $UserLocalAppData "Microsoft OfficePLUS" }
+    if ($UserAppData) { Join-Path $UserAppData "OfficePLUS" }
+    if ($UserAppData) { Join-Path $UserAppData "Microsoft OfficePLUS" }
 )
+# ---- END RULES ----
 
 # ==========================================
 # 2. 界面与辅助函数
@@ -294,7 +300,7 @@ function Invoke-OfficePlusScan {
 
     # 4. 检测计划任务
     Write-Host "`n[4] 计划任务检测：" -ForegroundColor Cyan
-    $tasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -like "*OfficePLUS*" -or $_.TaskPath -like "*OfficePLUS*" }
+    $tasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -like "*$TaskKeyword*" -or $_.TaskPath -like "*$TaskKeyword*" }
     if ($tasks) {
         foreach ($t in $tasks) {
             Write-Danger "发现守护计划任务: $($t.TaskName)"
@@ -497,7 +503,7 @@ function Invoke-OfficePlusNuke {
 
     # 4. 清理计划任务
     Write-Step "第 4/5 步: 清理关联计划任务..."
-    $tasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -like "*OfficePLUS*" -or $_.TaskPath -like "*OfficePLUS*" }
+    $tasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -like "*$TaskKeyword*" -or $_.TaskPath -like "*$TaskKeyword*" }
     if ($tasks) {
         foreach ($t in $tasks) {
             $t | Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue -ErrorVariable taskErr

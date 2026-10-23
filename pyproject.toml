@@ -22,3 +22,6 @@ remove-officeplus-gui = "remove_officeplus.gui:launch_gui"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+remove_officeplus = ["rules.json"]

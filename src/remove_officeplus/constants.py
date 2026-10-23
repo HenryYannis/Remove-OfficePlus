@@ -1,72 +1,47 @@
+"""OfficePLUS 的识别规则。
+
+规则只维护在同目录的 rules.json 一处，PowerShell 版也由它生成（scripts/sync_rules.py），
+避免两套实现越走越远。
+"""
+import json
 import os
 from .user_context import get_target_user
 
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules.json"), encoding="utf-8") as _fh:
+    RULES = json.load(_fh)
+
 # OfficePLUS 自身的进程：扫描时算作威胁
-OFFICEPLUS_PROCESSES = [
-    "MSOfficePLUSService.exe",
-    "OfficePLUS.AgentLauncher.exe",
-    "DeepLink.exe",
-    "OfficePLUS.exe",
-]
+OFFICEPLUS_PROCESSES = [f"{name}.exe" for name in RULES["officeplus_processes"]]
 
 # 正常的 Office 程序：不是威胁，只是清理时要关闭它们，才能删掉被占用的加载项文件
-OFFICE_APP_PROCESSES = [
-    "WINWORD.EXE",
-    "EXCEL.EXE",
-    "POWERPNT.EXE",
-    "OUTLOOK.EXE",
-]
+OFFICE_APP_PROCESSES = [f"{name}.EXE" for name in RULES["office_app_processes"]]
 
 # 清理时要结束的全部进程
 TARGET_PROCESSES = OFFICEPLUS_PROCESSES + OFFICE_APP_PROCESSES
 
-TARGET_SERVICES = [
-    "OfficePLUS Service",
-]
+TARGET_SERVICES = list(RULES["services"])
 
-TARGET_REGISTRY_KEYS = [
-    # HKLM 64-bit & Default
-    (r"Software\Microsoft\Office\Word\Addins\MSOfficePLUS", "HKLM"),
-    (r"Software\Microsoft\Office\Excel\Addins\MSOfficePLUS", "HKLM"),
-    (r"Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS", "HKLM"),
-    (r"Software\Microsoft\Office\Outlook\Addins\MSOfficePLUS", "HKLM"),
-    (r"Software\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS", "HKLM"),
-    (r"Software\Microsoft\OfficePLUS", "HKLM"),
-    # HKLM 32-bit (Wow6432Node)
-    (r"Software\Wow6432Node\Microsoft\Office\Word\Addins\MSOfficePLUS", "HKLM"),
-    (r"Software\Wow6432Node\Microsoft\Office\Excel\Addins\MSOfficePLUS", "HKLM"),
-    (r"Software\Wow6432Node\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS", "HKLM"),
-    (r"Software\Wow6432Node\Microsoft\Office\Outlook\Addins\MSOfficePLUS", "HKLM"),
-    (r"Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS", "HKLM"),
-    (r"Software\Wow6432Node\Microsoft\OfficePLUS", "HKLM"),
-    # HKCU User Level
-    (r"Software\Microsoft\Office\Word\Addins\MSOfficePLUS", "HKCU"),
-    (r"Software\Microsoft\Office\Excel\Addins\MSOfficePLUS", "HKCU"),
-    (r"Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS", "HKCU"),
-    (r"Software\Microsoft\Office\Outlook\Addins\MSOfficePLUS", "HKCU"),
-    (r"Software\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS", "HKCU"),
-    (r"Software\Microsoft\OfficePLUS", "HKCU"),
-]
+# 计划任务名或路径里含有这个词（不区分大小写）就算 OfficePLUS 的
+TASK_KEYWORD = RULES["task_keyword"]
+
+# [(子键路径, "HKLM"/"HKCU"), ...]；HKCU 会换成实际要清理的那个用户
+TARGET_REGISTRY_KEYS = [(path, root) for root, path in RULES["registry_keys"]]
+
 
 def get_target_directories():
-    # 用户目录取“实际要清理的用户”的，避免用其他管理员账号提权时清错人
+    # 用户目录取“实际要清理的用户”的，避免用其他管理员账号提权时清错人；
+    # 系统目录取环境变量，系统不装在 C 盘也能找到。哪个位置取不到就跳过，
+    # 绝不能拼成盘符根目录下的路径。
     user = get_target_user()
-    local_app_data = user.local_appdata
-    app_data = user.roaming_appdata
-    program_data = os.environ.get("ProgramData", r"C:\ProgramData")
-    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
-    program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
-
-    dirs = [
-        os.path.join(program_files, "Microsoft OfficePLUS"),
-        os.path.join(program_files_x86, "Microsoft OfficePLUS"),
-        os.path.join(program_data, "Microsoft OfficePLUS"),
-    ]
-    if local_app_data:
-        dirs.append(os.path.join(local_app_data, "OfficePLUS"))
-        dirs.append(os.path.join(local_app_data, "Microsoft OfficePLUS"))
-    if app_data:
-        dirs.append(os.path.join(app_data, "OfficePLUS"))
-        dirs.append(os.path.join(app_data, "Microsoft OfficePLUS"))
-
-    return [os.path.normpath(d) for d in dirs]
+    bases = {
+        "ProgramFiles": os.environ.get("ProgramFiles"),
+        "ProgramFiles(x86)": os.environ.get("ProgramFiles(x86)"),
+        "ProgramData": os.environ.get("ProgramData"),
+        "LocalAppData": user.local_appdata,
+        "AppData": user.roaming_appdata,
+    }
+    dirs = []
+    for base, name in RULES["directories"]:
+        if bases.get(base):
+            dirs.append(os.path.normpath(os.path.join(bases[base], name)))
+    return dirs

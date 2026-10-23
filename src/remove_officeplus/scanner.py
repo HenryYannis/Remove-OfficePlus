@@ -7,7 +7,7 @@ import ctypes
 from dataclasses import dataclass, field
 from typing import List
 from .user_context import resolve_key
-from .constants import OFFICEPLUS_PROCESSES, OFFICE_APP_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, get_target_directories
+from .constants import OFFICEPLUS_PROCESSES, OFFICE_APP_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, TASK_KEYWORD, get_target_directories
 
 @dataclass
 class ScanReport:
@@ -86,7 +86,7 @@ def scan_registry() -> List[str]:
     return found
 
 def is_officeplus_task(task_name: str) -> bool:
-    return "officeplus" in task_name.lower()
+    return TASK_KEYWORD.lower() in task_name.lower()
 
 def list_scheduled_tasks() -> List[str]:
     """列出所有计划任务的完整路径（如 \\OfficePLUS\\每日更新）。

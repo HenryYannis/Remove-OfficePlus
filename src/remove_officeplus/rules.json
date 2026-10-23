@@ -1,0 +1,36 @@
+{
+  "_说明": "OfficePLUS 识别规则，Python 版和 PowerShell 版共用这一份。改完运行 python scripts/sync_rules.py 同步到 PowerShell 脚本，CI 会检查两边是否一致。",
+  "officeplus_processes": ["MSOfficePLUSService", "OfficePLUS.AgentLauncher", "DeepLink", "OfficePLUS"],
+  "office_app_processes": ["WINWORD", "EXCEL", "POWERPNT", "OUTLOOK"],
+  "services": ["OfficePLUS Service"],
+  "task_keyword": "OfficePLUS",
+  "registry_keys": [
+    ["HKLM", "Software\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"],
+    ["HKLM", "Software\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"],
+    ["HKLM", "Software\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"],
+    ["HKLM", "Software\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"],
+    ["HKLM", "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"],
+    ["HKLM", "Software\\Microsoft\\OfficePLUS"],
+    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"],
+    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"],
+    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"],
+    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"],
+    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"],
+    ["HKLM", "Software\\Wow6432Node\\Microsoft\\OfficePLUS"],
+    ["HKCU", "Software\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"],
+    ["HKCU", "Software\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"],
+    ["HKCU", "Software\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"],
+    ["HKCU", "Software\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"],
+    ["HKCU", "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"],
+    ["HKCU", "Software\\Microsoft\\OfficePLUS"]
+  ],
+  "directories": [
+    ["ProgramFiles", "Microsoft OfficePLUS"],
+    ["ProgramFiles(x86)", "Microsoft OfficePLUS"],
+    ["ProgramData", "Microsoft OfficePLUS"],
+    ["LocalAppData", "OfficePLUS"],
+    ["LocalAppData", "Microsoft OfficePLUS"],
+    ["AppData", "OfficePLUS"],
+    ["AppData", "Microsoft OfficePLUS"]
+  ]
+}

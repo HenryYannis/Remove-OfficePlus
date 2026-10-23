@@ -32,6 +32,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
           pip install -e .
+      - name: Python 和 PowerShell 两边的规则必须一致
+        run: python scripts/sync_rules.py --check
+        env:
+          PYTHONUTF8: "1"
       - name: Test Python CLI Syntax & Import
         run: |
           python -m remove_officeplus --scan
