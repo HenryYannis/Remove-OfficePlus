@@ -277,29 +277,40 @@ function Invoke-OfficePlusNuke {
         }
     }
 
-    # 注册表备份
+    # 注册表备份：把要删的项合并导出成一个 .reg 文件，误删时双击即可恢复
+    $script:BackupFile = $null
+    $backupFailed = @()
     if (-not $NoBackup) {
-        $backupDir = if ($PSScriptRoot) { "$PSScriptRoot\..\backup_regs" } else { "$env:TEMP\OfficePLUS_backup_regs" }
-        if (-not (Test-Path $backupDir)) {
+        $existingRegs = @($TargetRegistryKeys | Where-Object { Test-Path $_ })
+        if ($existingRegs.Count -gt 0) {
+            $backupDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Remove-OfficePlus 备份"
             New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-        }
-        $timestamp = (Get-Date).ToString("yyyyMMdd_HHmmss")
-        $backupFile = "$backupDir\OfficePLUS_RegBackup_$timestamp.reg"
-        Write-Info "正在自动检测并导出注册表备份至: $backupFile"
-        
-        $exportedCount = 0
-        foreach ($reg in $TargetRegistryKeys) {
-            if (Test-Path $reg) {
-                $rawRegPath = $reg -replace 'HKLM:\\', 'HKLM\' -replace 'HKCU:\\', 'HKCU\'
-                $tempExport = "$backupDir\part_$exportedCount.reg"
-                & reg.exe export "$rawRegPath" "$tempExport" /y 2>$null
-                if (Test-Path $tempExport) {
-                    $exportedCount++
+            $tempDir = Join-Path $env:TEMP ("OfficePLUS_backup_" + [guid]::NewGuid())
+            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+            $header = "Windows Registry Editor Version 5.00"
+            $merged = New-Object System.Collections.Generic.List[string]
+            $merged.Add($header)
+            $i = 0
+            foreach ($reg in $existingRegs) {
+                $rawRegPath = $reg -replace '^HKLM:\\', 'HKLM\' -replace '^HKCU:\\', 'HKCU\'
+                $part = Join-Path $tempDir "$i.reg"
+                $null = & reg.exe export "$rawRegPath" "$part" /y /reg:64 2>&1
+                if ($LASTEXITCODE -eq 0 -and (Test-Path $part)) {
+                    $merged.Add("")
+                    $merged.AddRange([string[]](Get-Content -Path $part -Encoding Unicode | Where-Object { $_ -ne $header }))
+                } else {
+                    $backupFailed += $reg
+                    Write-Warn "注册表项备份失败，为安全起见本次不删除它: $reg"
                 }
+                $i++
             }
-        }
-        if ($exportedCount -gt 0) {
-            Write-Success "已成功备份 $exportedCount 项注册表数据。"
+            Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+            if ($merged.Count -gt 1) {
+                $timestamp = (Get-Date).ToString("yyyyMMdd_HHmmss")
+                $script:BackupFile = Join-Path $backupDir "OfficePLUS_注册表备份_$timestamp.reg"
+                Set-Content -Path $script:BackupFile -Value $merged -Encoding Unicode
+                Write-Success "已备份 $($existingRegs.Count - $backupFailed.Count) 项注册表到: $($script:BackupFile)"
+            }
         } else {
             Write-Info "未发现需备份的注册表项。"
         }
@@ -340,6 +351,7 @@ function Invoke-OfficePlusNuke {
     # 3. 清除 Office COM 加载项及注册表
     Write-Step "第 3/5 步: 彻底拔除全局与用户级注册表加载项..."
     foreach ($reg in $TargetRegistryKeys) {
+        if ($backupFailed -contains $reg) { continue }
         if (Test-Path $reg) {
             Remove-Item -Path $reg -Recurse -Force -ErrorAction SilentlyContinue
             if (Test-Path $reg) {
@@ -384,6 +396,11 @@ function Invoke-OfficePlusNuke {
     # 执行清理后复检，按实际结果汇报
     Write-Host "`n正在进行清理后状态复检..." -ForegroundColor Cyan
     $script:NukeRemaining = [int](Invoke-OfficePlusScan | Select-Object -Last 1)
+
+    if ($script:BackupFile) {
+        Write-Info "已删除的注册表项备份在: $($script:BackupFile)"
+        Write-Info "如果误删了需要的设置，双击这个文件即可恢复。"
+    }
 
     if ($script:NukeRemaining -eq 0) {
         Write-Host "============================================================" -ForegroundColor Green

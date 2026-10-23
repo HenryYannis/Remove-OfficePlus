@@ -1,6 +1,7 @@
 import argparse
 import sys
 from .scanner import run_scan
+from . import cleaner
 from .cleaner import run_nuke
 
 BANNER = """
@@ -71,6 +72,9 @@ def report_nuke_result() -> bool:
     print("\n正在进行清理后状态复检...")
     report = run_scan()
     display_scan(report)
+    if cleaner.LAST_BACKUP_PATH:
+        print(f"\n[*] 已删除的注册表项备份在: {cleaner.LAST_BACKUP_PATH}")
+        print("    如果误删了需要的设置，双击这个文件即可恢复。")
     print("=" * 60)
     if report.is_clean:
         print(" [完成] 微软 OfficePLUS 及关联组件已全部清除。")

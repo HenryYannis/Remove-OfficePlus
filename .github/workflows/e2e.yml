@@ -33,6 +33,8 @@ jobs:
         run: python -m remove_officeplus --nuke -f
       - name: 检查结果
         run: python tests/e2e/fake_residue.py verify
+      - name: 用备份文件恢复注册表
+        run: python tests/e2e/fake_residue.py backup-check
       - name: 删除失败时必须如实报告，不能显示成功
         run: |
           python tests/e2e/fake_residue.py plant
@@ -86,6 +88,8 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: 检查结果
         run: python tests/e2e/fake_residue.py verify
+      - name: 用备份文件恢复注册表
+        run: python tests/e2e/fake_residue.py backup-check
       - name: 删除失败时必须如实报告，不能显示成功
         run: |
           python tests/e2e/fake_residue.py plant

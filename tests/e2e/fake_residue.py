@@ -11,6 +11,7 @@
     python tests/e2e/fake_residue.py office-stop
     python tests/e2e/fake_residue.py lock-start    # 占住残留目录里的一个文件，让清理必然失败
     python tests/e2e/fake_residue.py lock-stop
+    python tests/e2e/fake_residue.py backup-check  # 清理后用备份文件恢复，检查注册表是否完整回来
 
 注意：假残留的位置取自 constants.py，只能验证“删除逻辑是否可靠”，
 不能证明这些路径就是真实 OfficePLUS 的安装位置。
@@ -146,6 +147,29 @@ def lock_stop():
         time.sleep(1)
 
 
+def backup_check():
+    import glob
+    from remove_officeplus.backup import get_backup_dir
+    files = sorted(glob.glob(os.path.join(get_backup_dir(), "*.reg")), key=os.path.getmtime)
+    if not files:
+        sys.exit(f"❌ 清理后没有生成注册表备份（{get_backup_dir()}）")
+    backup = files[-1]
+    print(f"备份文件: {backup}")
+    r = run(["reg.exe", "import", backup, "/reg:64"])
+    if r.returncode != 0:
+        sys.exit(f"❌ 备份文件无法导入: {r.stderr}")
+    missing = [f"{h}\\{p}" for p, h in TARGET_REGISTRY_KEYS if not key_exists(h, p + r"\Sub\Deeper")]
+    # 恢复完再删掉，让后续步骤从干净状态开始
+    for p, h in TARGET_REGISTRY_KEYS:
+        run(["reg.exe", "delete", f"{h}\\{p}", "/f", "/reg:64"])
+    for f in files:
+        os.remove(f)
+    if missing:
+        print("❌ 用备份恢复后，这些注册表项没有回来：", *missing, sep="\n  ")
+        sys.exit(1)
+    print(f"✅ 备份可用：{len(TARGET_REGISTRY_KEYS)} 项注册表（含子键和值）全部恢复。")
+
+
 def plant():
     for path, hive in TARGET_REGISTRY_KEYS:
         create_key(hive, path)
@@ -221,5 +245,5 @@ if __name__ == "__main__":
     {
         "plant": plant, "verify": verify, "cleanup": cleanup,
         "office-scan": office_scan, "office-start": office_start, "office-stop": office_stop,
-        "lock-start": lock_start, "lock-stop": lock_stop,
+        "lock-start": lock_start, "lock-stop": lock_stop, "backup-check": backup_check,
     }.get(action, lambda: sys.exit(__doc__))()
