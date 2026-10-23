@@ -28,6 +28,8 @@ jobs:
           pip install -e .
 
       - name: Build Executable
+        env:
+          PYTHONUTF8: "1"  # 打包脚本会输出中文，英文环境下不设这个会直接崩溃
         run: |
           python build_exe.py
 

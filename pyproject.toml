@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "remove-officeplus"
-version = "1.0.0"
+version = "1.1.0"
 description = "一键彻底根除微软OfficePLUS及同类顽固流氓加载项"
 readme = "README.md"
 authors = [{ name = "Remove-OfficePlus Contributors" }]
