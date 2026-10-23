@@ -12,6 +12,7 @@
     python tests/e2e/fake_residue.py lock-start    # 占住残留目录里的一个文件，让清理必然失败
     python tests/e2e/fake_residue.py lock-stop
     python tests/e2e/fake_residue.py backup-check  # 清理后用备份文件恢复，检查注册表是否完整回来
+    python tests/e2e/fake_residue.py log-check [fail]  # 检查生成了清理日志；带 fail 时日志里必须写明失败原因
 
 注意：假残留的位置取自 constants.py，只能验证“删除逻辑是否可靠”，
 不能证明这些路径就是真实 OfficePLUS 的安装位置。
@@ -334,6 +335,26 @@ def scan_check():
     print(f"[OK] 扫描报告了全部 {len(FAKE_TASKS)} 个假计划任务，没有误报")
 
 
+def log_check():
+    """清理后必须在备份文件夹里留下日志；清理失败时日志里要有失败的条目。"""
+    import glob
+    from remove_officeplus.backup import get_backup_dir
+    logs = sorted(glob.glob(os.path.join(get_backup_dir(), "清理日志_*.txt")), key=os.path.getmtime)
+    if not logs:
+        sys.exit(f"[FAIL] 没有生成清理日志（{get_backup_dir()}）")
+    path = logs[-1]
+    with open(path, "rb") as fh:
+        raw = fh.read()
+    text = raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8-sig")
+    print(f"日志 {path}:\n{text}")
+    expect_fail = len(sys.argv) > 2 and sys.argv[2] == "fail"
+    if "已删除" not in text:
+        sys.exit("[FAIL] 日志里没有记录删除了哪些项目")
+    if expect_fail and "locked.dat" not in text:
+        sys.exit("[FAIL] 有文件删不掉，日志里却没写是哪个文件")
+    print("[OK] 清理日志已生成" + ("，并写明了删除失败的文件" if expect_fail else ""))
+
+
 def cleanup():
     try:
         winreg.DeleteKeyEx(HIVES[SENTINEL_KEY[0]], SENTINEL_KEY[1], VIEW, 0)
@@ -350,7 +371,7 @@ if __name__ == "__main__":
         "plant": plant, "verify": verify, "cleanup": cleanup,
         "office-scan": office_scan, "office-start": office_start, "office-stop": office_stop,
         "lock-start": lock_start, "lock-stop": lock_stop, "backup-check": backup_check,
-        "scan-check": scan_check,
+        "scan-check": scan_check, "log-check": log_check,
         "block-backup": block_backup, "unblock-backup": unblock_backup,
         "registry-kept": registry_kept, "occupy-names": occupy_names, "names-check": names_check,
     }.get(action, lambda: sys.exit(__doc__))()
