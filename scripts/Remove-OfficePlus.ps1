@@ -67,19 +67,21 @@ function Get-ElevationArguments {
     return $argList
 }
 
+# 已是管理员返回 $true；否则以管理员身份另开窗口运行，当前这份返回 $false，由调用方直接结束。
+# 这里不能用 exit：irm | iex 在线运行时，exit 会把用户自己的 PowerShell 窗口一起关掉。
 function Elevate-Privileges {
-    if (-not (Test-IsAdmin)) {
-        Write-Host "`n[!] 检测到当前非管理员权限，正在请求 UAC 管理员提权..." -ForegroundColor Yellow
-        $argList = Get-ElevationArguments
-
-        try {
-            Start-Process powershell -Verb RunAs -ArgumentList $argList
-            exit
-        } catch {
-            Write-Error "提权失败或用户取消了 UAC 授权。请右键以管理员身份运行 PowerShell。"
-            exit 1
-        }
+    if (Test-IsAdmin) { return $true }
+    Write-Host "`n[!] 检测到当前非管理员权限，正在请求 UAC 管理员提权..." -ForegroundColor Yellow
+    $argList = Get-ElevationArguments
+    try {
+        Start-Process powershell -Verb RunAs -ArgumentList $argList -ErrorAction Stop
+        Write-Host "[*] 已在新的管理员窗口中继续运行，请在那个窗口里查看结果。" -ForegroundColor Gray
+        $script:ExitCode = 0
+    } catch {
+        Write-Host "[!] 提权失败或取消了 UAC 授权，本次未做任何修改。请右键以管理员身份运行 PowerShell。" -ForegroundColor Red
+        $script:ExitCode = 1
     }
+    return $false
 }
 
 # ==========================================
@@ -335,7 +337,11 @@ function Invoke-OfficePlusScan {
 $RestoreNote = "这个文件夹里是 Remove-OfficePlus 清理前自动备份的注册表。`r`n`r`n如果清理后某个 Office 功能或设置不正常，可以这样恢复：`r`n1. 找到那次清理对应的 .reg 文件，文件名里是清理的日期和时间，`r`n   例如 OfficePLUS_注册表备份_20261023_105700.reg；`r`n   同一秒内备份了多次时，后面的文件会加上 _2、_3。`r`n2. 双击它，在弹出的提示中点「是」（可能需要管理员权限）。`r`n3. 重新打开 Office 即可。`r`n`r`n注意：这些备份里只有被删除的 OfficePLUS 相关注册表项，恢复后 OfficePLUS 加载项也会回来。`r`n确认电脑一切正常后，可以直接删除这个文件夹。`r`n"
 
 function Invoke-OfficePlusNuke {
-    Elevate-Privileges
+    $script:NukeRemaining = 0
+    if (-not (Elevate-Privileges)) {
+        $script:NukeElevatedElsewhere = $true
+        return
+    }
 
     Write-Step "准备执行彻底根除清理..."
 
@@ -554,39 +560,56 @@ function Invoke-OfficePlusNuke {
 # ==========================================
 # 5. 交互主流程
 # ==========================================
-Show-Banner
+# 主流程放在函数里，用 return 结束并返回退出码。
+# 只有用文件方式运行（-File、双击 bat）时才 exit；irm | iex 在线运行时 exit 会关掉用户的窗口。
+function Invoke-Main {
+    Show-Banner
 
-if ($Scan) {
-    $null = Invoke-OfficePlusScan
-    exit
-}
-
-if ($Nuke) {
-    Invoke-OfficePlusNuke
-    if ($script:NukeRemaining -gt 0) { exit 1 }
-    exit
-}
-
-# 默认交互菜单模式
-$scanResult = Invoke-OfficePlusScan
-
-if ($scanResult -eq 0) {
-    Write-Host "系统目前处于干净状态，无需进一步清理。" -ForegroundColor Green
-    Write-Host "按任意键退出..."
-    $null = [Console]::ReadKey()
-    exit
-}
-
-if (-not $Force) {
-    Write-Host "是否立即执行彻底清理根除？(Y/N): " -NoNewline -ForegroundColor Yellow
-    $choice = [Console]::ReadLine()
-    if ($choice -notmatch "^[Yy]$") {
-        Write-Host "操作已取消。" -ForegroundColor Gray
-        exit
+    if ($Scan) {
+        $null = Invoke-OfficePlusScan
+        return 0
     }
+
+    if ($Nuke) {
+        $null = Invoke-OfficePlusNuke
+        if ($script:NukeElevatedElsewhere) { return $script:ExitCode }
+        if ($script:NukeRemaining -gt 0) { return 1 }
+        return 0
+    }
+
+    # 默认交互菜单模式
+    $scanResult = Invoke-OfficePlusScan
+
+    if ($scanResult -eq 0) {
+        Write-Host "系统目前处于干净状态，无需进一步清理。" -ForegroundColor Green
+        Wait-BeforeExit
+        return 0
+    }
+
+    if (-not $Force) {
+        Write-Host "是否立即执行彻底清理根除？(Y/N): " -NoNewline -ForegroundColor Yellow
+        $choice = [Console]::ReadLine()
+        if ($choice -notmatch "^[Yy]$") {
+            Write-Host "操作已取消。" -ForegroundColor Gray
+            return 0
+        }
+    }
+
+    $null = Invoke-OfficePlusNuke
+    if ($script:NukeElevatedElsewhere) { return $script:ExitCode }
+    Wait-BeforeExit
+    if ($script:NukeRemaining -gt 0) { return 1 }
+    return 0
 }
 
-Invoke-OfficePlusNuke
+# 双击运行时窗口会在结束后自动关闭，所以停一下让用户看清结果；输入被重定向时直接跳过。
+function Wait-BeforeExit {
+    if ([Console]::IsInputRedirected) { return }
+    Write-Host "按任意键退出..."
+    try { $null = [Console]::ReadKey($true) } catch { $null = Read-Host }
+}
 
-Write-Host "按任意键退出..."
-$null = [Console]::ReadKey()
+$script:ExitCode = 0
+$script:NukeElevatedElsewhere = $false
+$code = Invoke-Main
+if ($PSCommandPath) { exit $code }
