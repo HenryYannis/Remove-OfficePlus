@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Remove-OfficePlus: 一键彻底根除「微软 OfficePLUS」及同类顽固 Office 加载项。
+    Remove-OfficePlus: 清理「微软 OfficePLUS」Office 加载项及残留。
 
 .DESCRIPTION
     本脚本用于扫描、诊断并彻底清除「微软 OfficePLUS」插件。
@@ -10,7 +10,7 @@
     仅执行系统诊断与残留扫描，不进行任何修改操作。
 
 .PARAMETER Nuke
-    执行彻底清理根除操作。
+    执行清理操作。
 
 .PARAMETER NoBackup
     跳过注册表自动备份。
@@ -277,7 +277,7 @@ $TargetServices = @(Join-Unique (@($TargetServices) + @(Find-OfficePlusServices)
 function Show-Banner {
     Clear-Host
     Write-Host "============================================================" -ForegroundColor Cyan
-    Write-Host "         Remove-OfficePlus  |  Office 流氓插件彻底根除器     " -ForegroundColor Yellow
+    Write-Host "         Remove-OfficePlus  |  OfficePLUS 加载项清理工具     " -ForegroundColor Yellow
     Write-Host "       https://github.com/HenryYannis/Remove-OfficePlus     " -ForegroundColor DarkGray
     Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host ""
@@ -386,7 +386,7 @@ function Invoke-OfficePlusScan {
     Write-Host "`n------------------------------------------------------------" -ForegroundColor Cyan
     if ($foundItems -gt 0) {
         Write-Warn "排查完成：共检测到 $foundItems 处 OfficePLUS 关联项目/残留！"
-        Write-Host "建议执行彻底根除清理以防止其后台常驻或死灰复燃。" -ForegroundColor Yellow
+        Write-Host "建议执行清理，避免它在后台常驻或重新加载。" -ForegroundColor Yellow
     } else {
         Write-Success "排查完成：你的系统干干净净，未发现任何 OfficePLUS 残留！"
     }
@@ -396,7 +396,7 @@ function Invoke-OfficePlusScan {
 }
 
 # ==========================================
-# 4. 彻底根除模块 (Nuke / Clean)
+# 4. 清理模块 (Nuke / Clean)
 # ==========================================
 # 备份文件夹里的恢复说明（与 Python 版 backup.py 的 RESTORE_NOTE 内容一致）
 $RestoreNote = "这个文件夹里是 Remove-OfficePlus 清理前自动备份的注册表。`r`n`r`n如果清理后某个 Office 功能或设置不正常，可以这样恢复：`r`n1. 找到那次清理对应的 .reg 文件，文件名里是清理的日期和时间，`r`n   例如 OfficePLUS_注册表备份_20261023_105700.reg；`r`n   同一秒内备份了多次时，后面的文件会加上 _2、_3。`r`n2. 双击它，在弹出的提示中点「是」（可能需要管理员权限）。`r`n3. 重新打开 Office 即可。`r`n`r`n注意：这些备份里只有被删除的 OfficePLUS 相关注册表项，恢复后 OfficePLUS 加载项也会回来。`r`n确认电脑一切正常后，可以直接删除这个文件夹。`r`n"
@@ -408,7 +408,7 @@ function Invoke-OfficePlusNuke {
         return
     }
 
-    Write-Step "准备执行彻底根除清理..."
+    Write-Step "准备执行清理..."
 
     # 提醒用户先保存正在编辑的 Office 文档（-Force 时跳过）
     if (-not $Force) {
@@ -523,7 +523,7 @@ function Invoke-OfficePlusNuke {
                 if (Get-Process -Id $p.Id -ErrorAction SilentlyContinue) {
                     Write-Danger "无法结束进程: $pName (PID: $($p.Id))"
                 } else {
-                    Write-Danger "已强制终止进程: $pName (PID: $($p.Id))"
+                    Write-Danger "已结束进程: $pName (PID: $($p.Id))"
                 }
             }
         }
@@ -546,7 +546,7 @@ function Invoke-OfficePlusNuke {
     }
 
     # 3. 清除 Office COM 加载项及注册表
-    Write-Step "第 3/5 步: 彻底拔除全局与用户级注册表加载项..."
+    Write-Step "第 3/5 步: 移除全局与用户级注册表加载项..."
     foreach ($reg in $TargetRegistryKeys) {
         if ($backupFailed -contains $reg) { continue }
         if (Test-Path $reg) {
@@ -652,7 +652,7 @@ function Invoke-Main {
     }
 
     if (-not $Force) {
-        Write-Host "是否立即执行彻底清理根除？(Y/N): " -NoNewline -ForegroundColor Yellow
+        Write-Host "是否立即执行清理？(Y/N): " -NoNewline -ForegroundColor Yellow
         $choice = [Console]::ReadLine()
         if ($choice -notmatch "^[Yy]$") {
             Write-Host "操作已取消。" -ForegroundColor Gray

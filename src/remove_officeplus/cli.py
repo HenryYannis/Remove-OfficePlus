@@ -8,7 +8,7 @@ from .user_context import get_target_user
 
 BANNER = """
 ============================================================
-         Remove-OfficePlus  |  Office 流氓插件彻底根除器      
+         Remove-OfficePlus  |  OfficePLUS 加载项清理工具      
        https://github.com/HenryYannis/Remove-OfficePlus     
 ============================================================
 """
@@ -74,7 +74,7 @@ def display_scan(report):
     print("\n" + "-" * 60)
     if not report.is_clean:
         print(f"[!] 排查完成：共检测到 {report.total_threats} 处 OfficePLUS 关联项目/残留！")
-        print("建议执行彻底根除清理以防止其后台常驻或死灰复燃。")
+        print("建议执行清理，避免它在后台常驻或重新加载。")
     else:
         print("[+] 排查完成：你的系统干干净净，未发现任何 OfficePLUS 残留！")
     print("-" * 60 + "\n")
@@ -162,13 +162,13 @@ def display_plan(report):
 
 def main():
     _safe_console_output()
-    parser = argparse.ArgumentParser(description="Remove-OfficePlus: 一键彻底根除微软OfficePLUS及同类流氓加载项")
+    parser = argparse.ArgumentParser(description="Remove-OfficePlus: 清理微软 OfficePLUS 加载项及残留")
     parser.add_argument("--version", action="version", version=f"Remove-OfficePlus {__version__}")
     parser.add_argument("--gui", action="store_true", help="启动图形界面桌面窗口 (默认)")
     parser.add_argument("--cli", action="store_true", help="使用命令行交互模式")
     parser.add_argument("--scan", action="store_true", help="仅扫描诊断系统残留，不进行任何修改")
     parser.add_argument("--dry-run", action="store_true", help="预演：列出清理时会删除的项目，不进行任何修改")
-    parser.add_argument("--nuke", action="store_true", help="执行彻底根除清理（会先询问确认，加 -f 跳过）")
+    parser.add_argument("--nuke", action="store_true", help="执行清理（会先询问确认，加 -f 跳过）")
     parser.add_argument("-f", "--force", "--yes", action="store_true", help="跳过交互确认直接执行清理")
     parser.add_argument("--pause-on-exit", action="store_true", help=argparse.SUPPRESS)  # 提权重启时自动加上
 
@@ -223,7 +223,7 @@ def _run_cli(args) -> int:
                 return 0
             if not confirm_office_saved(report):
                 return 0
-        print(">>> 正在执行彻底根除清理...")
+        print(">>> 正在清理...")
         run_nuke()
         return 0 if report_nuke_result() else 1
 
@@ -237,14 +237,14 @@ def _run_cli(args) -> int:
         return 0
 
     if not args.force:
-        choice = input("是否立即执行彻底清理根除？(y/N): ").strip()
+        choice = input("是否立即执行清理？(y/N): ").strip()
         if choice.lower() != 'y':
             print("操作已取消。")
             return 0
         if not confirm_office_saved(report):
             return 0
 
-    print("\n>>> 正在执行彻底根除清理...")
+    print("\n>>> 正在清理...")
     run_nuke()
     clean = report_nuke_result()
     input("\n按回车键退出...")
