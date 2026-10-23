@@ -1,8 +1,8 @@
 # Remove-OfficePlus
 
 <p align="center">
-  <b>一键彻底根除「微软 OfficePLUS」及同类顽固流氓 Office 加载项，彻底杜绝后台常驻与死灰复燃。</b><br>
-  <i>Completely Eliminate Microsoft OfficePLUS & Rogue Office Add-ins with Zero Leftovers.</i>
+  <b>一键清除「微软 OfficePLUS」顽固 Office 加载项，删除前自动备份，杜绝后台常驻与死灰复燃。</b><br>
+  <i>Remove the Microsoft OfficePLUS add-in and its background service, with automatic registry backup.</i>
 </p>
 
 <p align="center">
@@ -24,18 +24,32 @@
 
 ### 底层对抗原理分析
 - **系统级服务守护**：常驻运行 `OfficePLUS Service`（`MSOfficePLUSService.exe`），以 `LocalSystem` 最高权限开机自启。
-- **系统全局注册表强载**：在 `HKEY_LOCAL_MACHINE`（而非当前用户 `HKCU`）强写 `LoadBehavior = 3`（强制开机载入）。每次打开 Office，Office 都会按系统级策略强制加载并覆盖用户设置。
+- **系统全局注册表强载**：在 `HKEY_LOCAL_MACHINE`（而非当前用户 `HKCU`）写入 `LoadBehavior = 3`（随 Office 启动自动加载）。系统级的加载项设置优先于用户在 Office 选项里的勾选，所以取消勾选后重启又会被加载。
 - **多处缓存潜伏**：在 `ProgramData` 与 `AppData` 存有配置文件与更新种子。
 
 ---
 
 ## 核心特性
 
-- **彻底根除**：进程 ➔ 服务 ➔ 注册表（HKLM / HKCU / 32 位兼容层）➔ 计划任务 ➔ 缓存目录全链路拔除。
-- **桌面图形界面**：提供现代化原生 GUI 窗口，排查状态、威胁卡片与清理日志一目了然。
-- **零依赖运行**：核心引擎基于原生 PowerShell 与独立绿色版编译，任何 Windows 10 / 11 电脑无需安装环境即可直接运行。
-- **自动提权**：自动检测管理员权限并触发 UAC 提权，无需手动右键复杂操作。
-- **诊断排查模式**：支持仅扫描诊断（`-Scan` / `--scan`），清晰列出系统中的威胁组件。
+- **全链路清理**：进程 ➔ 服务 ➔ 注册表（HKLM / HKCU / 32 位 / 即点即用版 Office）➔ 计划任务 ➔ 缓存目录。
+- **按特征识别**：除了已知名称，还会找出名称、描述里带「OfficePLUS」的加载项，以及程序指向 `MSOfficePLUSService.exe` 的服务，改了名也能找到；其他加载项和服务一概不碰。
+- **先备份再删除**：删除前把注册表导出成 `.reg` 备份，备份失败就不删；每次清理都留一份日志，删完自动复检。
+- **桌面图形界面**：提供原生 GUI 窗口，排查状态与清理结果一目了然。
+- **零依赖运行**：PowerShell 脚本和独立 exe，Windows 10 / 11 无需安装任何环境。
+- **自动提权**：需要管理员权限时自动弹出 UAC；用其他管理员账号授权时，清理的仍是当前登录用户的数据。
+- **只看不删**：支持仅扫描（`-Scan` / `--scan`）和预演（`--dry-run`），先看清楚再决定。
+
+目前专门针对 OfficePLUS。如果你遇到了它的新变种或类似的顽固加载项，欢迎提交 Issue。
+
+---
+
+## 运行前须知
+
+- **会关闭 Office**：清理时要结束 Word、Excel、PowerPoint、Outlook 才能删掉被占用的文件。检测到它们在运行时会先提醒你保存，请先保存好正在编辑的文档。
+- **需要管理员权限**：系统服务和全局注册表只有管理员才能删除，运行时会弹出 UAC 提示。
+- **备份和日志的位置**：`文档\Remove-OfficePlus 备份`。里面有注册表备份（`.reg`）、《如何恢复.txt》和每次的 `清理日志_日期_时间.txt`。
+- **如何恢复**：双击备份的 `.reg` 文件导入即可恢复注册表；删除的程序文件不会恢复，需要的话重新安装即可。
+- **只想先看看**：用扫描或预演模式，不会做任何修改（见下方参数表）。
 
 ---
 
@@ -45,7 +59,11 @@
 
 1. 前往 GitHub 的 [Releases 页面](https://github.com/HenryYannis/Remove-OfficePlus/releases) 下载最新版的 `Remove-OfficePlus-GUI.exe`。
 2. 双击运行程序，在弹出的 UAC 提示中点击「是」授权管理员权限。
-3. 点击「一键彻底根除」即可全自动完成深度清理与复检。
+3. 点击「一键彻底根除」即可全自动完成清理与复检。
+
+> **Windows 提示「已保护你的电脑」？** exe 没有购买代码签名证书，第一次运行时 SmartScreen 可能拦截。点「更多信息」→「仍要运行」即可。
+>
+> **校验文件**：Release 里附有 `SHA256SUMS.txt`。在 PowerShell 里运行 `Get-FileHash .\Remove-OfficePlus-GUI.exe`，结果和文件里的值一致，说明下载的文件没有被改动。
 
 ---
 
@@ -57,6 +75,8 @@
 # 运行极速排查与彻底清理
 irm https://raw.githubusercontent.com/HenryYannis/Remove-OfficePlus/main/scripts/Remove-OfficePlus.ps1 | iex
 ```
+
+脚本会先扫描并列出发现的残留，确认后才清理。这条命令始终运行仓库里的最新版本；如果想先看看脚本内容，可以在浏览器里打开上面的链接。
 
 ---
 
@@ -91,18 +111,38 @@ python main.py --version
 
 ---
 
+## 命令行参数
+
+| PowerShell 脚本 | Python 版 | 作用 |
+| :--- | :--- | :--- |
+| （不带参数） | `--cli` | 扫描后询问是否清理 |
+| `-Scan` | `--scan` | 只扫描，不做任何修改 |
+| — | `--dry-run` | 预演：列出清理时会删除的每一项，不做任何修改 |
+| `-Nuke` | `--nuke` | 执行清理。Python 版会先列出要删的项目并询问确认；Office 在运行时两者都会先提醒保存 |
+| `-Force` | `-f` / `--yes` | 跳过确认，直接清理 |
+| `-NoBackup` | — | 不备份注册表（不建议） |
+| — | `--version` | 显示版本号 |
+
+Python 版不带参数时启动图形界面。
+
+---
+
 ## 清理覆盖范围
 
 | 模块类别 | 目标路径 / 标识 | 处理方式 |
 | :--- | :--- | :--- |
-| **后台服务** | `OfficePLUS Service`（`MSOfficePLUSService.exe`） | 停止并使用 `sc delete` 彻底注销服务 |
+| **后台服务** | `OfficePLUS Service`，以及程序路径指向 `MSOfficePLUSService.exe` 的任何服务 | 停止并使用 `sc delete` 彻底注销服务 |
 | **占用进程** | `MSOfficePLUSService`、`OfficePLUS.AgentLauncher`、`DeepLink` 等 | 强制终止 |
 | **系统注册表（64 位）** | `HKLM:\Software\Microsoft\Office\<App>\Addins\MSOfficePLUS` | 彻底移除加载项 |
 | **系统注册表（32 位兼容）** | `HKLM:\Software\Wow6432Node\Microsoft\Office\<App>\Addins\MSOfficePLUS` | 彻底移除加载项 |
 | **用户注册表** | `HKCU:\Software\Microsoft\Office\<App>\Addins\MSOfficePLUS` | 彻底移除加载项 |
+| **按特征识别的加载项** | 以上各位置及即点即用版 Office 的虚拟注册表中，名称、FriendlyName、Description 或 Manifest 含「OfficePLUS」的加载项 | 彻底移除加载项 |
 | **卸载残留** | `...\Uninstall\MSOfficePLUS` | 清理控制面板残留键 |
-| **安装目录** | `C:\Program Files\Microsoft OfficePLUS` | 彻底删除所有二进制与 DLL 文件 |
-| **系统与应用缓存** | `C:\ProgramData\Microsoft OfficePLUS`<br>`%LOCALAPPDATA%\OfficePLUS` | 彻底清空数据与配置 |
+| **计划任务** | 名称或路径含「OfficePLUS」的计划任务 | 删除 |
+| **安装目录** | `%ProgramFiles%\Microsoft OfficePLUS`、`%ProgramFiles(x86)%\Microsoft OfficePLUS` | 彻底删除所有二进制与 DLL 文件 |
+| **系统与应用缓存** | `%ProgramData%\Microsoft OfficePLUS`<br>`%LOCALAPPDATA%` 和 `%APPDATA%` 下的 `OfficePLUS`、`Microsoft OfficePLUS` | 彻底清空数据与配置 |
+
+全部规则写在 [`src/remove_officeplus/rules.json`](src/remove_officeplus/rules.json)，Python 版和 PowerShell 版共用。
 
 每次清理前，要删除的注册表项会先导出到「文档\Remove-OfficePlus 备份」，双击 `.reg` 文件即可恢复（文件夹里有《如何恢复.txt》）。同一个文件夹里还会留下一份 `清理日志_日期_时间.txt`，记录这次删了什么、哪里失败及原因。
 
@@ -113,34 +153,40 @@ python main.py --version
 ```
 Remove-OfficePlus/
 ├── .github/
-│   ├── ISSUE_TEMPLATE/        # Issue 模板
+│   ├── ISSUE_TEMPLATE/          # Issue 模板
 │   └── workflows/
-│       ├── ci.yml             # CI 测试与语法校验
-│       └── release.yml        # GitHub Release 自动打包发布 exe 工作流
+│       ├── ci.yml               # 语法检查、规则一致性检查、打包 exe
+│       ├── e2e.yml              # 在 Windows 上种下假残留，真实清理并校验
+│       └── release.yml          # 推送 v* 标签时自动打包 exe 并发布
 ├── scripts/
-│   └── Remove-OfficePlus.ps1   # 原生 PowerShell 核心引擎（零依赖）
+│   ├── Remove-OfficePlus.ps1    # PowerShell 版（零依赖）
+│   └── sync_rules.py            # 把 rules.json 同步进 PowerShell 脚本
 ├── src/
-│   └── remove_officeplus/      # Python 核心模块
-│       ├── __init__.py
-│       ├── __main__.py
-│       ├── cli.py              # CLI 命令行入口
-│       ├── cleaner.py          # 核心清理实现
-│       ├── constants.py        # 目标路径与特征定义
-│       ├── gui.py              # 现代图形化桌面窗口
-│       └── scanner.py          # 诊断与扫描模块
-├── build_exe.py                # 单文件绿色版 exe 打包脚本
-├── Quick-Remove.bat            # Windows 双击快速启动脚本
-├── main.py                     # Python 快速启动入口
-├── pyproject.toml              # Python 包构建配置
-├── README.md                   # 项目说明
-└── LICENSE                     # MIT 开源协议
+│   └── remove_officeplus/       # Python 版（GUI 和 exe 也用这套代码）
+│       ├── rules.json           # 识别规则（唯一来源）
+│       ├── constants.py         # 读取规则
+│       ├── discovery.py         # 按特征识别改名的加载项和服务
+│       ├── scanner.py           # 扫描
+│       ├── cleaner.py           # 清理
+│       ├── backup.py            # 注册表备份与恢复说明
+│       ├── runlog.py            # 清理日志
+│       ├── user_context.py      # 确定要清理哪个用户
+│       ├── cli.py               # 命令行入口
+│       └── gui.py               # 图形界面
+├── tests/e2e/                   # 端到端测试脚本
+├── build_exe.py                 # 打包 exe（含版本信息和 SHA256）
+├── Quick-Remove.bat             # 双击运行
+├── main.py                      # Python 启动入口
+├── pyproject.toml               # Python 包配置
+├── AGENTS.md                    # 开发规范
+└── LICENSE                      # MIT 开源协议
 ```
 
 ---
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request。清理没删干净时，提交 Issue 请附上那次的清理日志。如果你发现了其他流氓 Office 加载项或新的变种特征，欢迎补充到规则库中。
+欢迎提交 Issue 和 Pull Request。清理没删干净时，提交 Issue 请附上那次的清理日志。发现了新的变种特征，欢迎补充到 `rules.json`，最好附上真实安装后的注册表导出作为依据；开发规范见 [AGENTS.md](AGENTS.md)。
 
 ---
 
