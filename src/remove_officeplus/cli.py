@@ -66,6 +66,20 @@ def display_scan(report):
         print("[+] 排查完成：你的系统干干净净，未发现任何 OfficePLUS 残留！")
     print("-" * 60 + "\n")
 
+def report_nuke_result() -> bool:
+    """清理后复检，按实际结果汇报。返回 True 表示已清除干净。"""
+    print("\n正在进行清理后状态复检...")
+    report = run_scan()
+    display_scan(report)
+    print("=" * 60)
+    if report.is_clean:
+        print(" [完成] 微软 OfficePLUS 及关联组件已全部清除。")
+    else:
+        print(f" [未完成] 还有 {report.total_threats} 处残留没能删除，见上方列表。")
+        print(" 建议重启电脑后再运行一次；仍然删不掉的话，欢迎到 GitHub 提交 Issue。")
+    print("=" * 60)
+    return report.is_clean
+
 def _safe_console_output():
     """输出被重定向到文件/管道且编码不支持中文时（例如英文 Windows 的 cp1252），
     用 ? 代替无法显示的字符，避免整个程序因 UnicodeEncodeError 崩溃。"""
@@ -107,13 +121,9 @@ def main():
         if not args.force and not confirm_office_saved(run_scan()):
             return
         print(">>> 正在执行彻底根除清理...")
-        procs, svcs, regs, tasks, dirs = run_nuke()
-        print("\n" + "=" * 60)
-        print(" [完成] 微软 OfficePLUS 及关联组件已全部彻底根除。")
-        print("=" * 60)
-        print("\n正在进行清理后状态复检...")
-        report = run_scan()
-        display_scan(report)
+        run_nuke()
+        if not report_nuke_result():
+            sys.exit(1)
         return
 
     # Interactive mode
@@ -135,12 +145,7 @@ def main():
 
     print("\n>>> 正在执行彻底根除清理...")
     run_nuke()
-    print("\n" + "=" * 60)
-    print(" [完成] 微软 OfficePLUS 及关联组件已全部彻底根除。")
-    print("=" * 60)
-    print("\n正在进行清理后状态复检...")
-    report = run_scan()
-    display_scan(report)
+    report_nuke_result()
     input("\n按回车键退出...")
 
 if __name__ == "__main__":
