@@ -231,6 +231,18 @@ def verify():
     print("✅ 假残留已全部清除，哨兵完好。")
 
 
+def scan_check():
+    """扫描必须报告全部假计划任务（含中文名），且不能把哨兵任务算进去。"""
+    from remove_officeplus.scanner import run_scan
+    found = {t.lstrip("\\").lower() for t in run_scan().scheduled_tasks}
+    missing = [t for t in FAKE_TASKS if t.lstrip("\\").lower() not in found]
+    wrong = [t for t in found if SENTINEL_TASK.lower() in t]
+    if missing or wrong:
+        print(f"[FAIL] 扫描漏报计划任务 {missing}，误报 {wrong}")
+        sys.exit(1)
+    print(f"[OK] 扫描报告了全部 {len(FAKE_TASKS)} 个假计划任务，没有误报")
+
+
 def cleanup():
     try:
         winreg.DeleteKeyEx(HIVES[SENTINEL_KEY[0]], SENTINEL_KEY[1], VIEW, 0)
@@ -247,4 +259,5 @@ if __name__ == "__main__":
         "plant": plant, "verify": verify, "cleanup": cleanup,
         "office-scan": office_scan, "office-start": office_start, "office-stop": office_stop,
         "lock-start": lock_start, "lock-stop": lock_stop, "backup-check": backup_check,
+        "scan-check": scan_check,
     }.get(action, lambda: sys.exit(__doc__))()

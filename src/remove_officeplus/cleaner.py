@@ -1,4 +1,3 @@
-import csv
 import os
 import sys
 import shutil
@@ -7,7 +6,7 @@ import subprocess
 import ctypes
 from typing import List, Tuple
 from .constants import TARGET_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, get_target_directories
-from .scanner import is_admin
+from .scanner import is_admin, list_scheduled_tasks, is_officeplus_task
 from .backup import backup_registry
 from .user_context import resolve_key
 
@@ -128,43 +127,14 @@ def clean_registry(skip=()) -> List[str]:
                 cleaned.append(reg_path)
     return cleaned
 
-def _list_scheduled_tasks() -> List[str]:
-    """列出所有计划任务的完整路径（如 \\OfficePLUS\\每日更新）。
-
-    直接读 Tasks 文件夹：文件名本身就是 Unicode，不受系统语言和代码页影响。
-    以前解析 schtasks 的输出并按 UTF-8 解码，中文系统上实际是 GBK，
-    带中文的任务名会变成乱码，拿去删除就会失败。
-    """
-    windir = os.environ.get("SystemRoot", r"C:\Windows")
-    system32 = os.path.join(windir, "Sysnative")  # 32 位 Python 在 64 位系统上要绕过重定向
-    if not os.path.isdir(system32):
-        system32 = os.path.join(windir, "System32")
-    root = os.path.join(system32, "Tasks")
-    names = []
-    for dirpath, _, files in os.walk(root):
-        rel = os.path.relpath(dirpath, root)
-        prefix = "\\" if rel == "." else "\\" + rel + "\\"
-        names.extend(prefix + f for f in files)
-    if names:
-        return names
-
-    # 读不到文件夹时退回 schtasks，按控制台实际使用的代码页解码（中文系统是 GBK）
-    output = subprocess.check_output(
-        ["schtasks", "/Query", "/FO", "CSV", "/NH"],
-        creationflags=subprocess.CREATE_NO_WINDOW,
-        encoding=f"cp{ctypes.windll.kernel32.GetOEMCP()}",
-        errors="replace",
-    )
-    return [row[0] for row in csv.reader(output.splitlines()) if row]
-
 def clean_scheduled_tasks() -> List[str]:
     cleaned = []
     try:
-        task_names = _list_scheduled_tasks()
+        task_names = list_scheduled_tasks()
     except Exception:
         return cleaned
     for task_name in task_names:
-        if "officeplus" not in task_name.lower():
+        if not is_officeplus_task(task_name):
             continue
         res = subprocess.run(
             ["schtasks", "/Delete", "/TN", task_name, "/F"],
