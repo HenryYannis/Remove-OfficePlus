@@ -5,11 +5,16 @@ import winreg
 import subprocess
 import ctypes
 from typing import List, Tuple
-from .constants import TARGET_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, get_target_directories
+from .constants import TARGET_PROCESSES, get_target_directories
 from .scanner import is_admin, list_scheduled_tasks, is_officeplus_task
 from .backup import backup_registry, get_backup_dir
 from . import runlog
 from .user_context import resolve_key
+from .discovery import get_registry_keys, get_services
+
+# 32 位程序（如 32 位 exe）访问 HKLM\Software 会被重定向到 Wow6432Node，
+# 一律指定 64 位视图；32 位那份由规则里的 Wow6432Node 路径单独覆盖
+VIEW = winreg.KEY_WOW64_64KEY
 
 # 最近一次清理生成的注册表备份文件路径（没有可备份的项时为 None）
 LAST_BACKUP_PATH = None
@@ -68,7 +73,7 @@ def kill_processes() -> List[str]:
 
 def delete_services() -> List[str]:
     removed = []
-    for svc in TARGET_SERVICES:
+    for svc in get_services():
         try:
             subprocess.run(
                 ["net", "stop", svc],
@@ -94,7 +99,7 @@ def _delete_reg_key_tree(root, subkey):
     """递归删除注册表键。先把子键名字全部读出来再逐个删除，
     这样某个子键删不掉时也不会反复重试、卡死。"""
     try:
-        with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ) as key:
+        with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ | VIEW) as key:
             children = []
             i = 0
             while True:
@@ -108,7 +113,7 @@ def _delete_reg_key_tree(root, subkey):
     for child in children:
         _delete_reg_key_tree(root, f"{subkey}\\{child}")
     try:
-        winreg.DeleteKey(root, subkey)
+        winreg.DeleteKeyEx(root, subkey, VIEW, 0)
     except FileNotFoundError:
         pass
     except OSError as e:
@@ -116,17 +121,20 @@ def _delete_reg_key_tree(root, subkey):
 
 def _reg_key_exists(root, subkey) -> bool:
     try:
-        with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ):
+        with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ | VIEW):
             return True
     except FileNotFoundError:
         return False
     except OSError:
         return True  # 没权限读也当作还在
 
-def clean_registry(skip=()) -> List[str]:
-    """删除目标注册表项。skip 中的项（备份失败的）不删，避免无法恢复。"""
+def clean_registry(skip=(), keys=None) -> List[str]:
+    """删除目标注册表项。skip 中的项（备份失败的）不删，避免无法恢复。
+    keys 默认重新查找；run_nuke 传入备份时用的同一份列表，保证删的都备份过。"""
+    if keys is None:
+        keys = get_registry_keys()
     cleaned = []
-    for key, root_name in TARGET_REGISTRY_KEYS:
+    for key, root_name in keys:
         root, subkey, reg_path = resolve_key(key, root_name)
         if (key, root_name) in skip:
             if _reg_key_exists(root, subkey):
@@ -200,11 +208,11 @@ def run_nuke() -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
     try:
         procs = kill_processes()
         svcs = delete_services()
-        existing = [(k, r) for k, r in TARGET_REGISTRY_KEYS if _reg_key_exists(*resolve_key(k, r)[:2])]
+        existing = [(k, r) for k, r in get_registry_keys() if _reg_key_exists(*resolve_key(k, r)[:2])]
         LAST_BACKUP_PATH, backup_failed = backup_registry(existing)
         if LAST_BACKUP_PATH:
             runlog.add(f"注册表备份: {LAST_BACKUP_PATH}")
-        regs = clean_registry(skip=backup_failed)
+        regs = clean_registry(skip=backup_failed, keys=existing)
         tasks = clean_scheduled_tasks()
         dirs = delete_directories()
         runlog.add("清理结束")

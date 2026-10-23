@@ -210,7 +210,66 @@ $TargetDirectories = @(
     if ($UserAppData) { Join-Path $UserAppData "OfficePLUS" }
     if ($UserAppData) { Join-Path $UserAppData "Microsoft OfficePLUS" }
 )
+
+# 按特征识别（见 Find-OfficePlusAddins / Find-OfficePlusServices）
+$AddinKeyword = "OfficePLUS"
+$AddinApps = @(
+    "Word",
+    "Excel",
+    "PowerPoint",
+    "Outlook"
+)
+$AddinParents = @(
+    "HKLM:\Software\Microsoft\Office\{app}\Addins",
+    "HKLM:\Software\Wow6432Node\Microsoft\Office\{app}\Addins",
+    "$UserRegRoot\Software\Microsoft\Office\{app}\Addins",
+    "HKLM:\Software\Microsoft\Office\ClickToRun\REGISTRY\MACHINE\Software\Microsoft\Office\{app}\Addins",
+    "HKLM:\Software\Microsoft\Office\ClickToRun\REGISTRY\MACHINE\Software\Wow6432Node\Microsoft\Office\{app}\Addins"
+)
+$ServiceImage = "MSOfficePLUSService.exe"
 # ---- END RULES ----
+
+# 按特征识别 OfficePLUS，补充上面写死的注册表项和服务名（写死的名字没用真实安装验证过，换个名字就会漏）。
+# 只认两个明确的特征，其他加载项和服务一概不碰：
+# - 各 Office 程序 Addins 下，键名、FriendlyName、Description 或 Manifest 含 $AddinKeyword 的加载项；
+# - 程序路径（ImagePath）指向 $ServiceImage 的系统服务。
+function Find-OfficePlusAddins {
+    foreach ($parentTemplate in $AddinParents) {
+        foreach ($app in $AddinApps) {
+            $parent = $parentTemplate.Replace("{app}", $app)
+            foreach ($key in @(Get-ChildItem -LiteralPath $parent -ErrorAction SilentlyContinue)) {
+                $texts = @($key.PSChildName)
+                foreach ($valueName in "FriendlyName", "Description", "Manifest") {
+                    $texts += [string]$key.GetValue($valueName)
+                }
+                if (@($texts | Where-Object { $_ -like "*$AddinKeyword*" }).Count -gt 0) {
+                    "$parent\$($key.PSChildName)"
+                }
+            }
+        }
+    }
+}
+
+function Find-OfficePlusServices {
+    foreach ($key in @(Get-ChildItem -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services" -ErrorAction SilentlyContinue)) {
+        if ([string]$key.GetValue("ImagePath") -like "*$ServiceImage*") { $key.PSChildName }
+    }
+}
+
+# 合并并去重（PowerShell 的哈希表键不区分大小写）
+function Join-Unique {
+    param([object[]]$Items)
+    $seen = @{}
+    foreach ($item in $Items) {
+        if ($item -and -not $seen.ContainsKey($item)) {
+            $seen[$item] = $true
+            $item
+        }
+    }
+}
+
+$TargetRegistryKeys = @(Join-Unique (@($TargetRegistryKeys) + @(Find-OfficePlusAddins)))
+$TargetServices = @(Join-Unique (@($TargetServices) + @(Find-OfficePlusServices)))
 
 # ==========================================
 # 2. 界面与辅助函数

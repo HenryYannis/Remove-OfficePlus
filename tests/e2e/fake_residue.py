@@ -45,6 +45,18 @@ SENTINEL_KEY = ("HKCU", r"Software\Microsoft\Office\Word\Addins\SentinelKeepMe")
 SENTINEL_DIR = os.path.join(os.environ["LOCALAPPDATA"], "SentinelKeepMe")
 SENTINEL_TASK = "SentinelKeepMe"
 
+# 按特征识别：名字不在写死的规则里，但 FriendlyName/Description 含 OfficePLUS 的加载项，
+# 包括即点即用版 Office 的虚拟注册表；以及程序路径指向 MSOfficePLUSService.exe 但名字不同的服务
+FEATURE_KEYS = [
+    ("HKCU", r"Software\Microsoft\Office\Word\Addins\OPAssistant.Connect", "FriendlyName", "OfficePLUS 智能助手"),
+    ("HKLM", r"Software\Microsoft\Office\ClickToRun\REGISTRY\MACHINE\Software\Microsoft\Office\Excel\Addins\Templates.Addin",
+     "Description", "Templates by officeplus"),
+]
+FEATURE_SERVICE = ("OPXUpdateSvc", r"C:\OfficePLUSFake\MSOfficePLUSService.exe -run")
+# 特征哨兵：正常的第三方加载项和服务，必须保留
+SENTINEL_ADDIN = ("HKCU", r"Software\Microsoft\Office\Word\Addins\Grammarly.Addin", "FriendlyName", "Grammarly for Office")
+SENTINEL_SERVICE = "SentinelKeepSvc"
+
 
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, errors="replace")
@@ -58,9 +70,9 @@ def key_exists(hive, path):
         return False
 
 
-def create_key(hive, path, with_children=True):
+def create_key(hive, path, with_children=True, value_name="FriendlyName", text="Fake OfficePLUS"):
     key = winreg.CreateKeyEx(HIVES[hive], path, 0, winreg.KEY_ALL_ACCESS | VIEW)
-    winreg.SetValueEx(key, "FriendlyName", 0, winreg.REG_SZ, "Fake OfficePLUS")
+    winreg.SetValueEx(key, value_name, 0, winreg.REG_SZ, text)
     winreg.SetValueEx(key, "LoadBehavior", 0, winreg.REG_DWORD, 3)
     winreg.CloseKey(key)
     if with_children:
@@ -162,7 +174,8 @@ def backup_check():
         sys.exit(f"❌ 备份文件无法导入: {r.stderr}")
     missing = [f"{h}\\{p}" for p, h in TARGET_REGISTRY_KEYS if not key_exists(h, p + r"\Sub\Deeper")]
     # 恢复完再删掉，让后续步骤从干净状态开始
-    for p, h in TARGET_REGISTRY_KEYS:
+    missing += [f"{h}\\{p}" for h, p, _, _ in FEATURE_KEYS if not key_exists(h, p)]
+    for p, h in TARGET_REGISTRY_KEYS + [(p, h) for h, p, _, _ in FEATURE_KEYS]:
         run(["reg.exe", "delete", f"{h}\\{p}", "/f", "/reg:64"])
     for f in files:
         os.remove(f)
@@ -281,14 +294,21 @@ def plant():
         r = run(["schtasks", "/Create", "/TN", t, "/TR", "cmd /c exit", "/SC", "ONCE", "/ST", "23:59", "/F"])
         print(f"create task {t}: {r.returncode}")
     start_fake(FAKE_PROCESS_NAME)
+    for hive, path, value_name, text in FEATURE_KEYS:
+        create_key(hive, path, value_name=value_name, text=text)
+    run(["sc.exe", "create", FEATURE_SERVICE[0], "binPath=", FEATURE_SERVICE[1], "start=", "demand"])
     # 哨兵
-    create_key(SENTINEL_KEY[0], SENTINEL_KEY[1], with_children=False)
+    create_key(SENTINEL_KEY[0], SENTINEL_KEY[1], with_children=False, text="Sentinel Keep Me")
+    create_key(SENTINEL_ADDIN[0], SENTINEL_ADDIN[1], with_children=False, value_name=SENTINEL_ADDIN[2], text=SENTINEL_ADDIN[3])
+    run(["sc.exe", "create", SENTINEL_SERVICE, "binPath=", r"C:\Windows\System32\cmd.exe /c exit", "start=", "demand"])
     os.makedirs(SENTINEL_DIR, exist_ok=True)
 
     missing = [p for p, h in TARGET_REGISTRY_KEYS if not key_exists(h, p)]
     missing += [d for d in get_target_directories() if not os.path.isdir(d)]
     missing += [s for s in TARGET_SERVICES if not service_exists(s)]
     missing += [t for t in FAKE_TASKS if not task_exists(t)]
+    missing += [p for h, p, _, _ in FEATURE_KEYS if not key_exists(h, p)]
+    missing += [s for s in (FEATURE_SERVICE[0], SENTINEL_SERVICE) if not service_exists(s)]
     if not process_running(FAKE_PROCESS_NAME):
         missing.append(FAKE_PROCESS_NAME)
     if missing:
@@ -303,6 +323,9 @@ def verify():
     left += [f"目录 {d}" for d in get_target_directories() if os.path.exists(d)]
     left += [f"服务 {s}" for s in TARGET_SERVICES if service_exists(s)]
     left += [f"计划任务 {t}" for t in FAKE_TASKS if task_exists(t)]
+    left += [f"按特征识别的注册表 {h}\\{p}" for h, p, _, _ in FEATURE_KEYS if key_exists(h, p)]
+    if service_exists(FEATURE_SERVICE[0]):
+        left.append(f"按特征识别的服务 {FEATURE_SERVICE[0]}")
     if process_running(FAKE_PROCESS_NAME):
         left.append(f"进程 {FAKE_PROCESS_NAME}")
 
@@ -313,6 +336,10 @@ def verify():
         hurt.append(f"目录 {SENTINEL_DIR}")
     if not task_exists(SENTINEL_TASK):
         hurt.append(f"计划任务 {SENTINEL_TASK}")
+    if not key_exists(SENTINEL_ADDIN[0], SENTINEL_ADDIN[1]):
+        hurt.append(f"正常加载项 {SENTINEL_ADDIN[1]}")
+    if not service_exists(SENTINEL_SERVICE):
+        hurt.append(f"正常服务 {SENTINEL_SERVICE}")
 
     if left:
         print("❌ 没删干净：", *left, sep="\n  ")
@@ -332,6 +359,16 @@ def scan_check():
     if missing or wrong:
         print(f"[FAIL] 扫描漏报计划任务 {missing}，误报 {wrong}")
         sys.exit(1)
+    report = run_scan()
+    regs = " ".join(report.registry_keys).lower()
+    miss = [p for _, p, _, _ in FEATURE_KEYS if p.lower() not in regs]
+    if FEATURE_SERVICE[0] not in report.services:
+        miss.append(FEATURE_SERVICE[0])
+    wrong = [x for x in report.registry_keys + report.services if "grammarly" in x.lower() or SENTINEL_SERVICE.lower() in x.lower()]
+    if miss or wrong:
+        print(f"[FAIL] 按特征识别漏报 {miss}，误报 {wrong}")
+        sys.exit(1)
+    print(f"[OK] 按特征识别出 {len(FEATURE_KEYS)} 个改名的加载项和 1 个改名的服务，正常加载项和服务没有误报")
     print(f"[OK] 扫描报告了全部 {len(FAKE_TASKS)} 个假计划任务，没有误报")
 
 
@@ -361,6 +398,8 @@ def cleanup():
     except OSError:
         pass
     run(["schtasks", "/Delete", "/TN", SENTINEL_TASK, "/F"])
+    run(["sc.exe", "delete", SENTINEL_SERVICE])
+    run(["reg.exe", "delete", f"{SENTINEL_ADDIN[0]}\\{SENTINEL_ADDIN[1]}", "/f"])
     if os.path.isdir(SENTINEL_DIR):
         os.rmdir(SENTINEL_DIR)
 
