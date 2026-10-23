@@ -33,9 +33,22 @@ jobs:
         run: python -m remove_officeplus --nuke -f
       - name: 检查结果
         run: python tests/e2e/fake_residue.py verify
+      - name: 删除失败时必须如实报告，不能显示成功
+        run: |
+          python tests/e2e/fake_residue.py plant
+          python tests/e2e/fake_residue.py lock-start
+          python -m remove_officeplus --nuke -f
+          $code = $LASTEXITCODE
+          python tests/e2e/fake_residue.py lock-stop
+          if ($code -eq 0) { Write-Error "有文件删不掉，清理却报告成功（退出码 0）"; exit 1 }
+          python -m remove_officeplus --nuke -f
+          if ($LASTEXITCODE) { Write-Error "文件解除占用后，第二次清理仍然失败"; exit 1 }
+          python tests/e2e/fake_residue.py verify
       - name: 收尾
         if: always()
-        run: python tests/e2e/fake_residue.py cleanup
+        run: |
+          python tests/e2e/fake_residue.py lock-stop
+          python tests/e2e/fake_residue.py cleanup
 
   powershell:
     name: PowerShell 版（${{ matrix.shell }}）
@@ -73,6 +86,19 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: 检查结果
         run: python tests/e2e/fake_residue.py verify
+      - name: 删除失败时必须如实报告，不能显示成功
+        run: |
+          python tests/e2e/fake_residue.py plant
+          python tests/e2e/fake_residue.py lock-start
+          & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\scripts\Remove-OfficePlus.ps1 -Nuke
+          $code = $LASTEXITCODE
+          python tests/e2e/fake_residue.py lock-stop
+          if ($code -eq 0) { Write-Error "有文件删不掉，清理却报告成功（退出码 0）"; exit 1 }
+          & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\scripts\Remove-OfficePlus.ps1 -Nuke
+          if ($LASTEXITCODE) { Write-Error "文件解除占用后，第二次清理仍然失败"; exit 1 }
+          python tests/e2e/fake_residue.py verify
       - name: 收尾
         if: always()
-        run: python tests/e2e/fake_residue.py cleanup
+        run: |
+          python tests/e2e/fake_residue.py lock-stop
+          python tests/e2e/fake_residue.py cleanup
