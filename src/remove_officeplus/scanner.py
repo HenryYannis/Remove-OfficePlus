@@ -1,5 +1,6 @@
 import csv
 import os
+import sys
 import winreg
 import subprocess
 import ctypes
@@ -131,13 +132,25 @@ def scan_directories() -> List[str]:
             found.append(d)
     return found
 
+def _safe(fn, *args):
+    """单独一项检测出错时只跳过这一项，不让整个扫描崩掉。
+
+    GUI 在后台线程里调用 run_scan，一旦抛出异常线程就悄悄结束，
+    按钮一直是灰的、界面停在“正在扫描”，用户只能关掉程序。
+    """
+    try:
+        return fn(*args)
+    except Exception as e:
+        print(f"[!] {fn.__name__} 检测出错，已跳过：{e!r}", file=sys.stderr)
+        return []
+
 def run_scan() -> ScanReport:
     return ScanReport(
         is_admin=is_admin(),
-        processes=scan_processes(),
-        services=scan_services(),
-        registry_keys=scan_registry(),
-        directories=scan_directories(),
-        scheduled_tasks=scan_scheduled_tasks(),
-        office_apps=scan_processes(OFFICE_APP_PROCESSES),
+        processes=_safe(scan_processes),
+        services=_safe(scan_services),
+        registry_keys=_safe(scan_registry),
+        directories=_safe(scan_directories),
+        scheduled_tasks=_safe(scan_scheduled_tasks),
+        office_apps=_safe(scan_processes, OFFICE_APP_PROCESSES),
     )
