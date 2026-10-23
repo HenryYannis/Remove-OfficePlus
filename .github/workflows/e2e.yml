@@ -51,6 +51,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: 模拟一键命令（irm | iex）能否正常解析
+        run: |
+          # irm 会按 UTF-8 解码，且不会去掉开头的 BOM；这里照样构造字符串，交给对应版本的 PowerShell 解析
+          & ${{ matrix.shell }} -NoProfile -Command '$t = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes(".\scripts\Remove-OfficePlus.ps1")); $null = [scriptblock]::Create($t); "parse ok"'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: 种下假残留
         run: python tests/e2e/fake_residue.py plant
       - name: 执行清理
