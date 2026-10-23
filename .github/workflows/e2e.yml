@@ -51,6 +51,15 @@ jobs:
           python tests/e2e/other_user.py plant
           python tests/e2e/other_user.py run-python
           python tests/e2e/other_user.py verify
+      - name: 非管理员启动时提权重启（python -m、main.py、取消 UAC）
+        run: |
+          python tests/e2e/fake_residue.py plant
+          python tests/e2e/elevation_relaunch.py cancel
+          python tests/e2e/elevation_relaunch.py module
+          python tests/e2e/fake_residue.py verify
+          python tests/e2e/fake_residue.py plant
+          python tests/e2e/elevation_relaunch.py main-py
+          python tests/e2e/fake_residue.py verify
       - name: 收尾
         if: always()
         run: |
