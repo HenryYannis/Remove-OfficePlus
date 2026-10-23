@@ -57,7 +57,7 @@
 
 ### 方式 1：下载独立绿色版程序（小白推荐）
 
-1. 前往 GitHub 的 [Releases 页面](https://github.com/HenryYannis/Remove-OfficePlus/releases) 下载最新版的 `Remove-OfficePlus-GUI.exe`。
+1. 前往 GitHub 的 [Releases 页面](https://github.com/HenryYannis/Remove-OfficePlus/releases) 下载最新版的 `Remove-OfficePlus-GUI.exe`。打不开 GitHub 的话，可以从[国内下载页](https://files.xbkjz.cn/apps/officeplus/)下载。程序窗口右下角显示当前版本号，点「下载最新版」也会打开这个页面。
 2. 双击运行程序，在弹出的 UAC 提示中点击「是」授权管理员权限。
 3. 点击「一键清理」即可全自动完成清理与复检。
 

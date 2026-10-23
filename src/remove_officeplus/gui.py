@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from typing import Optional
 
+from . import __version__, DOWNLOAD_URL
 from .scanner import run_scan, is_admin, ScanReport
 from .cleaner import run_nuke, elevate
 
@@ -24,7 +25,7 @@ class ModernGUI(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("Remove-OfficePlus | OfficePLUS 加载项清理工具")
+        self.title(f"Remove-OfficePlus v{__version__} | OfficePLUS 加载项清理工具")
         
         # 默认尺寸与最小尺寸
         default_w = 880
@@ -74,6 +75,9 @@ class ModernGUI(tk.Tk):
 
     def _open_website(self, event=None):
         webbrowser.open_new_tab("https://xbkjz.cn")
+
+    def _open_download(self, event=None):
+        webbrowser.open_new_tab(DOWNLOAD_URL)
 
     def _create_widgets(self):
         # ================= 1. 顶部简介与权限状态栏 =================
@@ -203,15 +207,26 @@ class ModernGUI(tk.Tk):
         site_link.pack(side="left")
         site_link.bind("<Button-1>", self._open_website)
 
-        # 右下角：轻量状态标识
+        # 右下角：下载最新版链接 + 当前版本号
+        download_link = tk.Label(
+            bottom_bar,
+            text="下载最新版",
+            bg="#F3F4F6",
+            fg="#2563EB",
+            font=("Microsoft YaHei UI", 9, "underline"),
+            cursor="hand2"
+        )
+        download_link.pack(side="right")
+        download_link.bind("<Button-1>", self._open_download)
+
         version_label = tk.Label(
             bottom_bar,
-            text="Remove-OfficePlus 开源工具",
+            text=f"当前版本 v{__version__}",
             bg="#F3F4F6",
             fg="#9CA3AF",
             font=("Microsoft YaHei UI", 9)
         )
-        version_label.pack(side="right")
+        version_label.pack(side="right", padx=(0, 10))
 
         # ================= 5. 日志控制台 (填充中间剩余全部空间) =================
         log_frame = ttk.Frame(self, style="Card.TFrame", padding=(14, 10))
