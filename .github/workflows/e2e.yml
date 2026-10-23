@@ -117,6 +117,17 @@ jobs:
           & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\tests\e2e\other-user.ps1
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python tests/e2e/other_user.py verify
+      - name: 双击 Quick-Remove.bat 也能正常清理
+        if: matrix.shell == 'powershell'
+        run: |
+          # cmd.exe 按系统代码页读 .bat（中文系统是 GBK），文件必须是纯 ASCII + CRLF
+          $t = [IO.File]::ReadAllText("Quick-Remove.bat", [Text.Encoding]::GetEncoding(28591))
+          if ($t -match '[^\x00-\x7F]') { Write-Error "Quick-Remove.bat 含非 ASCII 字符"; exit 1 }
+          if ($t -match "(?<!`r)`n") { Write-Error "Quick-Remove.bat 不是 CRLF 换行"; exit 1 }
+          python tests/e2e/fake_residue.py plant
+          # 模拟用户：确认清理输入 Y，后面几次回车应付“按任意键”
+          "Y`r`n`r`n`r`n" | cmd /c Quick-Remove.bat
+          python tests/e2e/fake_residue.py verify
       - name: 收尾
         if: always()
         run: |
