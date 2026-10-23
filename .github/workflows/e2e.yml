@@ -28,7 +28,9 @@ jobs:
       - name: 种下假残留
         run: python tests/e2e/fake_residue.py plant
       - name: 清理前扫描
-        run: python -m remove_officeplus --scan
+        run: |
+          python -m remove_officeplus --scan
+          python tests/e2e/fake_residue.py scan-check
       - name: 执行清理
         run: python -m remove_officeplus --nuke -f
       - name: 检查结果
