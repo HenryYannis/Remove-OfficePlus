@@ -1,6 +1,6 @@
 # AGENTS.md — Remove-OfficePlus
 
-本项目用于检测并清除顽固的「微软 OfficePLUS」Office 加载项及其后台服务，防止它自动复活。
+本项目用于检测并清理「微软 OfficePLUS」Office 加载项及其后台服务，避免它重新加载。
 
 ## 架构
 
