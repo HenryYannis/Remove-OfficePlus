@@ -28,7 +28,9 @@ def _relaunch_command() -> Tuple[str, List[str]]:
     package_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     code = (f"import sys; sys.path.insert(0, {package_parent!r}); "
             "from remove_officeplus.cli import main; main()")
-    return sys.executable, ["-c", code] + sys.argv[1:]
+    # 新开的管理员控制台窗口结束后会立刻关闭，加上这个参数让它停一下，用户才看得到结果
+    extra = [] if "--pause-on-exit" in sys.argv else ["--pause-on-exit"]
+    return sys.executable, ["-c", code] + sys.argv[1:] + extra
 
 def elevate() -> bool:
     """没有管理员权限时弹出 UAC，以管理员身份重新启动自己并退出当前进程。
