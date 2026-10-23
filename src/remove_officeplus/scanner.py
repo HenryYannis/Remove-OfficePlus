@@ -4,7 +4,7 @@ import subprocess
 import ctypes
 from dataclasses import dataclass, field
 from typing import List
-from .constants import TARGET_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, get_target_directories
+from .constants import OFFICEPLUS_PROCESSES, OFFICE_APP_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, get_target_directories
 
 @dataclass
 class ScanReport:
@@ -13,6 +13,8 @@ class ScanReport:
     services: List[str] = field(default_factory=list)
     registry_keys: List[str] = field(default_factory=list)
     directories: List[str] = field(default_factory=list)
+    # 正在运行的正常 Office 程序，仅用于清理前提醒保存，不计入威胁
+    office_apps: List[str] = field(default_factory=list)
 
     @property
     def total_threats(self) -> int:
@@ -28,7 +30,7 @@ def is_admin() -> bool:
     except Exception:
         return False
 
-def scan_processes() -> List[str]:
+def scan_processes(targets=OFFICEPLUS_PROCESSES) -> List[str]:
     found = []
     try:
         output = subprocess.check_output(
@@ -41,7 +43,7 @@ def scan_processes() -> List[str]:
             parts = [p.strip(' "') for p in line.split('","')]
             if parts:
                 proc_name = parts[0]
-                for target in TARGET_PROCESSES:
+                for target in targets:
                     if proc_name.lower() == target.lower():
                         found.append(f"{proc_name} (PID: {parts[1]})")
     except Exception:
@@ -98,5 +100,6 @@ def run_scan() -> ScanReport:
         processes=scan_processes(),
         services=scan_services(),
         registry_keys=scan_registry(),
-        directories=scan_directories()
+        directories=scan_directories(),
+        office_apps=scan_processes(OFFICE_APP_PROCESSES),
     )

@@ -23,6 +23,8 @@ jobs:
           python-version: "3.11"
       - name: 安装
         run: pip install -e .
+      - name: 正常运行的 Word 不应被当成威胁
+        run: python tests/e2e/fake_residue.py office-scan
       - name: 种下假残留
         run: python tests/e2e/fake_residue.py plant
       - name: 清理前扫描
@@ -56,6 +58,13 @@ jobs:
           # irm 会按 UTF-8 解码，且不会去掉开头的 BOM；这里照样构造字符串，交给对应版本的 PowerShell 解析
           & ${{ matrix.shell }} -NoProfile -Command '$t = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes(".\scripts\Remove-OfficePlus.ps1")); $null = [scriptblock]::Create($t); "parse ok"'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: 正常运行的 Word 不应被当成威胁
+        run: |
+          python tests/e2e/fake_residue.py office-start
+          $out = & ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -File .\scripts\Remove-OfficePlus.ps1 -Scan | Out-String
+          python tests/e2e/fake_residue.py office-stop
+          $out
+          if ($out -match "WINWORD") { Write-Error "把正常运行的 Word 当成了威胁"; exit 1 }
       - name: 种下假残留
         run: python tests/e2e/fake_residue.py plant
       - name: 执行清理
