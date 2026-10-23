@@ -78,16 +78,24 @@ function Elevate-Privileges {
 # ==========================================
 # 1. 目标组件定义
 # ==========================================
-$TargetProcesses = @(
+# OfficePLUS 自身的进程：扫描时算作威胁
+$OfficePlusProcesses = @(
     "MSOfficePLUSService",
     "OfficePLUS.AgentLauncher",
     "DeepLink",
-    "OfficePLUS",
+    "OfficePLUS"
+)
+
+# 正常的 Office 程序：不是威胁，只是清理时要关闭它们，才能删掉被占用的加载项文件
+$OfficeAppProcesses = @(
     "WINWORD",
     "EXCEL",
     "POWERPNT",
     "OUTLOOK"
 )
+
+# 清理时要结束的全部进程
+$TargetProcesses = $OfficePlusProcesses + $OfficeAppProcesses
 
 $TargetServices = @(
     "OfficePLUS Service"
@@ -171,7 +179,7 @@ function Invoke-OfficePlusScan {
 
     # 1. 检测运行进程
     Write-Host "`n[1] 进程检测：" -ForegroundColor Cyan
-    $runningProcs = Get-Process -Name $TargetProcesses -ErrorAction SilentlyContinue
+    $runningProcs = Get-Process -Name $OfficePlusProcesses -ErrorAction SilentlyContinue
     if ($runningProcs) {
         foreach ($p in $runningProcs) {
             Write-Danger "发现运行中进程: $($p.Name) (PID: $($p.Id))"
@@ -255,7 +263,7 @@ function Invoke-OfficePlusNuke {
 
     # 提醒用户先保存正在编辑的 Office 文档（-Force 时跳过）
     if (-not $Force) {
-        $openOffice = Get-Process -Name "WINWORD", "EXCEL", "POWERPNT", "OUTLOOK" -ErrorAction SilentlyContinue
+        $openOffice = Get-Process -Name $OfficeAppProcesses -ErrorAction SilentlyContinue
         if ($openOffice) {
             $names = ($openOffice | Select-Object -ExpandProperty Name -Unique) -join "、"
             Write-Warn "检测到以下 Office 程序正在运行：$names"
