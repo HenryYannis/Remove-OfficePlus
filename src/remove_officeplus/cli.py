@@ -3,6 +3,7 @@ import sys
 from .scanner import run_scan
 from . import cleaner
 from .cleaner import run_nuke
+from .user_context import get_target_user
 
 BANNER = """
 ============================================================
@@ -30,6 +31,9 @@ def print_banner():
 def display_scan(report):
     print(">>> 正在进行系统环境全面排查扫描...\n")
     print(f"[*] 管理员权限运行: {'是' if report.is_admin else '否'}")
+    target = get_target_user()
+    if target.sid:
+        print(f"[*] 当前以其他管理员账号运行，将检查和清理登录用户「{target.name}」的个人设置与文件。")
 
     print("\n[1] 进程检测：")
     if report.processes:
