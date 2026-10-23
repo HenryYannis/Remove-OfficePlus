@@ -190,6 +190,10 @@ def run_nuke() -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
     if not elevate():
         print("[!] 没有管理员权限，本次未做任何修改。")
         return [], [], [], [], []
+    # 中途出现意外错误时不往外抛：GUI 在后台线程里调用这里，异常会让线程悄悄结束、
+    # 界面一直卡在“正在清理”。改为停止后续步骤、记进日志，返回已经完成的部分，
+    # 调用方随后的复检会如实列出没删掉的残留。
+    procs, svcs, regs, tasks, dirs = [], [], [], [], []
     runlog.start()
     try:
         procs = kill_processes()
@@ -202,9 +206,10 @@ def run_nuke() -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
         tasks = clean_scheduled_tasks()
         dirs = delete_directories()
         runlog.add("清理结束")
-        return procs, svcs, regs, tasks, dirs
     except Exception as e:
-        runlog.add(f"[错误] 清理中断: {e!r}")
-        raise
+        import traceback
+        runlog.add(f"[错误] 清理意外中断，后续步骤未执行: {e!r}\n{traceback.format_exc()}")
+        print(f"[!] 清理意外中断：{e!r}，详情见清理日志。", file=sys.stderr)
     finally:
         runlog.save(get_backup_dir())
+    return procs, svcs, regs, tasks, dirs

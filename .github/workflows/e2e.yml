@@ -51,6 +51,12 @@ jobs:
           python -m remove_officeplus --nuke -f
           if ($LASTEXITCODE) { Write-Error "文件解除占用后，第二次清理仍然失败"; exit 1 }
           python tests/e2e/fake_residue.py verify
+      - name: 扫描或清理中途出错时不能卡死（GUI 后台线程）
+        run: |
+          python tests/e2e/fake_residue.py plant
+          python tests/e2e/core_no_raise.py
+          python -m remove_officeplus --nuke -f
+          python tests/e2e/fake_residue.py verify
       - name: 用其他管理员账号运行时，只清理登录用户的数据
         run: |
           python tests/e2e/other_user.py plant
