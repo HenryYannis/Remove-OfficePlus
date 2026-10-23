@@ -1,0 +1,2 @@
+# .bat 必须保持 CRLF 原样存储，不做换行转换（用户直接下载 ZIP 也是 CRLF）
+*.bat -text
