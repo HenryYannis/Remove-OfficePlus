@@ -96,8 +96,10 @@ def process_running(name):
 
 
 def start_fake(name, minutes=60):
-    """把 ping.exe 复制成指定名字并后台运行，模拟一个进程。"""
-    fake_exe = os.path.join(tempfile.mkdtemp(), name)
+    """把 ping.exe 复制成指定名字并后台运行，模拟一个进程。
+    清理时会核对 OfficePLUS 进程的程序路径，所以放在名字含 OfficePLUS 的临时文件夹里，
+    和真实安装（C:\\Program Files\\Microsoft OfficePLUS\\...）一样。"""
+    fake_exe = os.path.join(tempfile.mkdtemp(prefix="OfficePLUS_e2e_"), name)
     with open(r"C:\Windows\System32\PING.EXE", "rb") as src, open(fake_exe, "wb") as dst:
         dst.write(src.read())
     subprocess.Popen([fake_exe, "-n", str(minutes * 60), "127.0.0.1"],

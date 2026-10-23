@@ -21,6 +21,9 @@ TARGET_PROCESSES = OFFICEPLUS_PROCESSES + OFFICE_APP_PROCESSES
 
 TARGET_SERVICES = list(RULES["services"])
 
+# OfficePLUS 自己的进程，程序所在文件夹的路径里必须含有这个词（不区分大小写）才会被结束
+OFFICEPLUS_KEYWORD = RULES["addin_keyword"]
+
 # 计划任务名或路径里含有这个词（不区分大小写）就算 OfficePLUS 的
 TASK_KEYWORD = RULES["task_keyword"]
 
@@ -34,7 +37,9 @@ def get_target_directories():
     # 绝不能拼成盘符根目录下的路径。
     user = get_target_user()
     bases = {
-        "ProgramFiles": os.environ.get("ProgramFiles"),
+        # 32 位 Python 在 64 位系统上，ProgramFiles 会被换成 Program Files (x86)，
+        # ProgramW6432 才是真正的 64 位 Program Files
+        "ProgramFiles": os.environ.get("ProgramW6432") or os.environ.get("ProgramFiles"),
         "ProgramFiles(x86)": os.environ.get("ProgramFiles(x86)"),
         "ProgramData": os.environ.get("ProgramData"),
         "LocalAppData": user.local_appdata,
