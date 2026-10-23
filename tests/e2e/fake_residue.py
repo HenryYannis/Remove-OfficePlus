@@ -35,7 +35,8 @@ from remove_officeplus.constants import (  # noqa: E402
 HIVES = {"HKLM": winreg.HKEY_LOCAL_MACHINE, "HKCU": winreg.HKEY_CURRENT_USER}
 VIEW = winreg.KEY_WOW64_64KEY  # 显式使用 64 位视图，路径里自带 Wow6432Node 的照写
 
-FAKE_TASKS = [r"OfficePLUS Fake Updater", r"\OfficePLUS\FakeDaily"]
+# 带中文的任务名：中文系统上命令行输出是 GBK，曾因按 UTF-8 解码而删不掉
+FAKE_TASKS = [r"OfficePLUS Fake Updater", r"\OfficePLUS\FakeDaily", r"\OfficePLUS\每日更新"]
 FAKE_PROCESS_NAME = "OfficePLUS.exe"
 
 # 哨兵：名字相近但不属于 OfficePLUS，清理后必须还在
