@@ -1,7 +1,7 @@
 import argparse
 import sys
 from .scanner import run_scan
-from . import cleaner
+from . import cleaner, runlog
 from .cleaner import run_nuke
 from .user_context import get_target_user
 
@@ -86,6 +86,10 @@ def report_nuke_result() -> bool:
     if cleaner.LAST_BACKUP_PATH:
         print(f"\n[*] 已删除的注册表项备份在: {cleaner.LAST_BACKUP_PATH}")
         print("    如果误删了需要的设置，双击这个文件即可恢复。")
+    if runlog.LAST_LOG_PATH:
+        print(f"[*] 本次清理日志: {runlog.LAST_LOG_PATH}")
+        if not report.is_clean:
+            print("    提交 Issue 时附上这个文件，方便定位问题。")
     print("=" * 60)
     if report.is_clean:
         print(" [完成] 微软 OfficePLUS 及关联组件已全部清除。")
