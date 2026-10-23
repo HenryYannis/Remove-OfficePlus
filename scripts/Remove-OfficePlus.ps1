@@ -355,6 +355,26 @@ function Invoke-OfficePlusNuke {
         }
     }
 
+    # 清理日志：把这次清理的全部输出（包括失败原因）记到备份文件夹里，方便排查和提交 Issue
+    $script:LogFile = $null
+    try {
+        $logDir = Join-Path $UserDocuments "Remove-OfficePlus 备份"
+        New-Item -ItemType Directory -Path $logDir -Force -ErrorAction Stop | Out-Null
+        $stem = "清理日志_" + (Get-Date).ToString("yyyyMMdd_HHmmss")
+        $logPath = Join-Path $logDir "$stem.txt"
+        $n = 2
+        while (Test-Path -LiteralPath $logPath) {
+            $logPath = Join-Path $logDir "${stem}_$n.txt"
+            $n++
+        }
+        Start-Transcript -LiteralPath $logPath -ErrorAction Stop | Out-Null
+        $script:LogFile = $logPath
+        Write-Host "Remove-OfficePlus 开始清理  系统: $([Environment]::OSVersion.VersionString)  PowerShell: $($PSVersionTable.PSVersion)"
+    } catch {
+        # 日志写不了不影响清理
+        Write-Verbose "清理日志创建失败: $($_.Exception.Message)"
+    }
+
     # 注册表备份：把要删的项合并导出成一个 .reg 文件，误删时双击即可恢复
     $script:BackupFile = $null
     $backupFailed = @()
@@ -459,9 +479,10 @@ function Invoke-OfficePlusNuke {
     foreach ($reg in $TargetRegistryKeys) {
         if ($backupFailed -contains $reg) { continue }
         if (Test-Path $reg) {
-            Remove-Item -Path $reg -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $reg -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable regErr
             if (Test-Path $reg) {
                 Write-Danger "删除注册表项失败: $reg"
+                if ($regErr) { Write-Info "原因: $($regErr[0].Exception.Message)" }
             } else {
                 Write-Success "已删除注册表项: $reg"
             }
@@ -473,9 +494,10 @@ function Invoke-OfficePlusNuke {
     $tasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -like "*OfficePLUS*" -or $_.TaskPath -like "*OfficePLUS*" }
     if ($tasks) {
         foreach ($t in $tasks) {
-            $t | Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue
+            $t | Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue -ErrorVariable taskErr
             if (Get-ScheduledTask -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction SilentlyContinue) {
                 Write-Danger "注销计划任务失败: $($t.TaskName)"
+                if ($taskErr) { Write-Info "原因: $($taskErr[0].Exception.Message)" }
             } else {
                 Write-Success "已注销计划任务: $($t.TaskName)"
             }
@@ -490,9 +512,10 @@ function Invoke-OfficePlusNuke {
         if (Test-Path $dir) {
             # 解除只读/隐藏/系统文件属性锁定
             $null = & cmd.exe /c "attrib -r -s -h `"$dir\*`" /s /d" 2>$null
-            Remove-Item -Path $dir -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $dir -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable dirErr
             if (Test-Path $dir) {
                 Write-Danger "目录未能完全删除（可能有文件正被占用）: $dir"
+                foreach ($e in @($dirErr | Select-Object -First 3)) { Write-Info "原因: $($e.Exception.Message)" }
             } else {
                 Write-Success "已删除目录: $dir"
             }
@@ -507,6 +530,10 @@ function Invoke-OfficePlusNuke {
         Write-Info "已删除的注册表项备份在: $($script:BackupFile)"
         Write-Info "如果误删了需要的设置，双击这个文件即可恢复。"
     }
+    if ($script:LogFile) {
+        Write-Info "本次清理日志: $($script:LogFile)"
+        if ($script:NukeRemaining -gt 0) { Write-Info "提交 Issue 时附上这个文件，方便定位问题。" }
+    }
 
     if ($script:NukeRemaining -eq 0) {
         Write-Host "============================================================" -ForegroundColor Green
@@ -517,6 +544,10 @@ function Invoke-OfficePlusNuke {
         Write-Host "  [!] 还有 $($script:NukeRemaining) 处残留没能删除，见上方列表。" -ForegroundColor Red
         Write-Host "  建议重启电脑后再运行一次；仍然删不掉的话，欢迎到 GitHub 提交 Issue。" -ForegroundColor Red
         Write-Host "============================================================" -ForegroundColor Red
+    }
+
+    if ($script:LogFile) {
+        try { Stop-Transcript | Out-Null } catch { }
     }
 }
 

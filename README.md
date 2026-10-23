@@ -98,6 +98,8 @@ python main.py --nuke
 | **安装目录** | `C:\Program Files\Microsoft OfficePLUS` | 彻底删除所有二进制与 DLL 文件 |
 | **系统与应用缓存** | `C:\ProgramData\Microsoft OfficePLUS`<br>`%LOCALAPPDATA%\OfficePLUS` | 彻底清空数据与配置 |
 
+每次清理前，要删除的注册表项会先导出到「文档\Remove-OfficePlus 备份」，双击 `.reg` 文件即可恢复（文件夹里有《如何恢复.txt》）。同一个文件夹里还会留下一份 `清理日志_日期_时间.txt`，记录这次删了什么、哪里失败及原因。
+
 ---
 
 ## 项目结构
@@ -132,7 +134,7 @@ Remove-OfficePlus/
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request。如果你发现了其他流氓 Office 加载项或新的变种特征，欢迎补充到规则库中。
+欢迎提交 Issue 和 Pull Request。清理没删干净时，提交 Issue 请附上那次的清理日志。如果你发现了其他流氓 Office 加载项或新的变种特征，欢迎补充到规则库中。
 
 ---
 

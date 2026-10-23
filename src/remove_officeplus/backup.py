@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Iterable, Optional, Set, Tuple
 
 from .user_context import get_target_user, resolve_key
+from . import runlog
 
 BACKUP_FOLDER_NAME = "Remove-OfficePlus 备份"
 REG_HEADER = "Windows Registry Editor Version 5.00"
@@ -92,6 +93,7 @@ def backup_registry(keys: Iterable[Tuple[str, str]]) -> Tuple[Optional[str], Set
                 parts.append(text.replace(REG_HEADER, "", 1).strip("\r\n"))
             else:
                 failed.add((subkey, root_name))
+                runlog.add(f"[失败] 导出注册表项 {resolve_key(subkey, root_name)[2]}，退出码 {res.returncode}")
 
     if not parts:
         return None, failed
@@ -103,6 +105,7 @@ def backup_registry(keys: Iterable[Tuple[str, str]]) -> Tuple[Optional[str], Set
     except Exception as e:
         # 备份文件写不进去（文件夹无权限、磁盘满等）：一项都不删，宁可这次不清注册表
         print(f"[!] 注册表备份文件写入失败（{e}），为安全起见本次不删除任何注册表项。")
+        runlog.add(f"[失败] 写入注册表备份: {e}；本次不删除任何注册表项")
         return None, set(keys)
     _write_restore_note(backup_dir)
     return path, failed

@@ -7,7 +7,8 @@ import ctypes
 from typing import List, Tuple
 from .constants import TARGET_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, get_target_directories
 from .scanner import is_admin, list_scheduled_tasks, is_officeplus_task
-from .backup import backup_registry
+from .backup import backup_registry, get_backup_dir
+from . import runlog
 from .user_context import resolve_key
 
 # 最近一次清理生成的注册表备份文件路径（没有可备份的项时为 None）
@@ -52,13 +53,15 @@ def kill_processes() -> List[str]:
             res = subprocess.run(
                 ["taskkill", "/F", "/IM", proc],
                 creationflags=subprocess.CREATE_NO_WINDOW,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                capture_output=True, text=True, errors="replace"
             )
             if res.returncode == 0:  # 没在运行或结束失败都不算
                 killed.append(proc)
-        except Exception:
-            pass
+                runlog.add(f"已结束进程: {proc}")
+            elif res.returncode != 128:  # 128 = 没有这个进程
+                runlog.add(f"[失败] 结束进程 {proc}: {runlog.output_text(res)}")
+        except Exception as e:
+            runlog.add(f"[失败] 结束进程 {proc}: {e}")
     return killed
 
 def delete_services() -> List[str]:
@@ -74,13 +77,15 @@ def delete_services() -> List[str]:
             res = subprocess.run(
                 ["sc.exe", "delete", svc],
                 creationflags=subprocess.CREATE_NO_WINDOW,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                capture_output=True, text=True, errors="replace"
             )
             if res.returncode == 0:
                 removed.append(svc)
-        except Exception:
-            pass
+                runlog.add(f"已删除服务: {svc}")
+            elif res.returncode != 1060:  # 1060 = 服务不存在
+                runlog.add(f"[失败] 删除服务 {svc}: {runlog.output_text(res)}")
+        except Exception as e:
+            runlog.add(f"[失败] 删除服务 {svc}: {e}")
     return removed
 
 def _delete_reg_key_tree(root, subkey):
@@ -102,8 +107,10 @@ def _delete_reg_key_tree(root, subkey):
         _delete_reg_key_tree(root, f"{subkey}\\{child}")
     try:
         winreg.DeleteKey(root, subkey)
-    except OSError:
+    except FileNotFoundError:
         pass
+    except OSError as e:
+        runlog.add(f"[失败] 删除注册表子项 {subkey}: {e}")
 
 def _reg_key_exists(root, subkey) -> bool:
     try:
@@ -118,20 +125,26 @@ def clean_registry(skip=()) -> List[str]:
     """删除目标注册表项。skip 中的项（备份失败的）不删，避免无法恢复。"""
     cleaned = []
     for key, root_name in TARGET_REGISTRY_KEYS:
-        if (key, root_name) in skip:
-            continue
         root, subkey, reg_path = resolve_key(key, root_name)
+        if (key, root_name) in skip:
+            if _reg_key_exists(root, subkey):
+                runlog.add(f"[跳过] 备份失败，未删除注册表项: {reg_path}")
+            continue
         if _reg_key_exists(root, subkey):
             _delete_reg_key_tree(root, subkey)
             if not _reg_key_exists(root, subkey):  # 删完复查，真的没了才算成功
                 cleaned.append(reg_path)
+                runlog.add(f"已删除注册表项: {reg_path}")
+            else:
+                runlog.add(f"[失败] 注册表项仍然存在: {reg_path}")
     return cleaned
 
 def clean_scheduled_tasks() -> List[str]:
     cleaned = []
     try:
         task_names = list_scheduled_tasks()
-    except Exception:
+    except Exception as e:
+        runlog.add(f"[失败] 读取计划任务列表: {e}")
         return cleaned
     for task_name in task_names:
         if not is_officeplus_task(task_name):
@@ -139,11 +152,13 @@ def clean_scheduled_tasks() -> List[str]:
         res = subprocess.run(
             ["schtasks", "/Delete", "/TN", task_name, "/F"],
             creationflags=subprocess.CREATE_NO_WINDOW,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            capture_output=True, text=True, errors="replace"
         )
         if res.returncode == 0:
             cleaned.append(task_name)
+            runlog.add(f"已删除计划任务: {task_name}")
+        else:
+            runlog.add(f"[失败] 删除计划任务 {task_name}: {runlog.output_text(res)}")
     return cleaned
 
 def _on_rm_error(func, path, exc_info):
@@ -151,8 +166,8 @@ def _on_rm_error(func, path, exc_info):
     try:
         os.chmod(path, stat.S_IWRITE)
         func(path)
-    except Exception:
-        pass
+    except Exception as e:
+        runlog.add(f"[失败] 删除 {path}: {e}")
 
 def delete_directories() -> List[str]:
     deleted = []
@@ -162,8 +177,11 @@ def delete_directories() -> List[str]:
                 shutil.rmtree(d, onerror=_on_rm_error)
                 if not os.path.exists(d):
                     deleted.append(d)
-            except Exception:
-                pass
+                    runlog.add(f"已删除目录: {d}")
+                else:
+                    runlog.add(f"[失败] 目录未能完全删除: {d}")
+            except Exception as e:
+                runlog.add(f"[失败] 删除目录 {d}: {e}")
     return deleted
 
 def run_nuke() -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
@@ -172,11 +190,21 @@ def run_nuke() -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
     if not elevate():
         print("[!] 没有管理员权限，本次未做任何修改。")
         return [], [], [], [], []
-    procs = kill_processes()
-    svcs = delete_services()
-    existing = [(k, r) for k, r in TARGET_REGISTRY_KEYS if _reg_key_exists(*resolve_key(k, r)[:2])]
-    LAST_BACKUP_PATH, backup_failed = backup_registry(existing)
-    regs = clean_registry(skip=backup_failed)
-    tasks = clean_scheduled_tasks()
-    dirs = delete_directories()
-    return procs, svcs, regs, tasks, dirs
+    runlog.start()
+    try:
+        procs = kill_processes()
+        svcs = delete_services()
+        existing = [(k, r) for k, r in TARGET_REGISTRY_KEYS if _reg_key_exists(*resolve_key(k, r)[:2])]
+        LAST_BACKUP_PATH, backup_failed = backup_registry(existing)
+        if LAST_BACKUP_PATH:
+            runlog.add(f"注册表备份: {LAST_BACKUP_PATH}")
+        regs = clean_registry(skip=backup_failed)
+        tasks = clean_scheduled_tasks()
+        dirs = delete_directories()
+        runlog.add("清理结束")
+        return procs, svcs, regs, tasks, dirs
+    except Exception as e:
+        runlog.add(f"[错误] 清理中断: {e!r}")
+        raise
+    finally:
+        runlog.save(get_backup_dir())
