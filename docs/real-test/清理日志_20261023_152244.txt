@@ -1,0 +1,20 @@
+[2026-10-23 15:22:42] Remove-OfficePlus 1.1.0 开始清理
+[2026-10-23 15:22:42] 系统: Windows-10-10.0.19044-SP0  Python: 3.11.9  (打包版)
+[2026-10-23 15:22:42] 已结束进程: MSOfficePLUSService.exe
+[2026-10-23 15:22:43] 已结束进程: EXCEL.EXE
+[2026-10-23 15:22:43] 已删除服务: OfficePLUS Service
+[2026-10-23 15:22:43] 注册表备份: C:\Users\HP\Documents\Remove-OfficePlus 备份\OfficePLUS_注册表备份_20261023_152243.reg
+[2026-10-23 15:22:43] 已删除注册表项: HKLM\Software\Microsoft\Office\Word\Addins\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKLM\Software\Microsoft\Office\Excel\Addins\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKLM\Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKLM\Software\Wow6432Node\Microsoft\Office\Word\Addins\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKLM\Software\Wow6432Node\Microsoft\Office\Excel\Addins\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKLM\Software\Wow6432Node\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKCU\Software\Microsoft\Office\Word\Addins\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKCU\Software\Microsoft\Office\Excel\Addins\MSOfficePLUS
+[2026-10-23 15:22:43] 已删除注册表项: HKCU\Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS
+[2026-10-23 15:22:44] 已删除目录: C:\Program Files\Microsoft OfficePLUS
+[2026-10-23 15:22:44] 已删除目录: C:\ProgramData\Microsoft OfficePLUS
+[2026-10-23 15:22:44] 已删除目录: C:\Users\HP\AppData\Local\OfficePLUS
+[2026-10-23 15:22:44] 清理结束
