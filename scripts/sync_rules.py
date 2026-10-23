@@ -65,6 +65,8 @@ def render(rules: dict) -> str:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")  # 英文 Windows 控制台不是 UTF-8，输出中文时不能崩
     with open(RULES, encoding="utf-8") as fh:
         block = render(json.load(fh))
     raw = open(PS1, "rb").read()
