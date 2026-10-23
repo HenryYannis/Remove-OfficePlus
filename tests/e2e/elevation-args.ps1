@@ -7,7 +7,7 @@ $fn = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.Fun
 if (-not $fn) { throw '找不到 Get-ElevationArguments' }
 . ([scriptblock]::Create($fn.Extent.Text))
 
-$ScriptPath = $script; $Scan = $false; $Nuke = $true; $NoBackup = $false; $Force = $true
+$ScriptPath = $script; $Scan = $false; $Nuke = $true; $Force = $true
 $a = Get-ElevationArguments
 Write-Host "本地模式参数: $a"
 if ($a -notlike "*-File `"$script`"*") { throw '没有执行本地脚本' }

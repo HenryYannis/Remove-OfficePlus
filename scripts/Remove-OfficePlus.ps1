@@ -12,9 +12,6 @@
 .PARAMETER Nuke
     执行清理操作。
 
-.PARAMETER NoBackup
-    跳过注册表自动备份。
-
 .PARAMETER Force
     跳过交互确认提示，直接执行。
 
@@ -31,7 +28,6 @@ param(
     [Parameter(ParameterSetName = "Nuke")]
     [switch]$Nuke,
 
-    [switch]$NoBackup,
     [switch]$Force
 )
 
@@ -57,7 +53,6 @@ function Get-ElevationArguments {
         $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
         if ($Scan) { $argList += " -Scan" }
         if ($Nuke) { $argList += " -Nuke" }
-        if ($NoBackup) { $argList += " -NoBackup" }
         if ($Force) { $argList += " -Force" }
     } else {
         # irm | iex 在线运行时没有本地文件，只能重新拉取同一个地址
@@ -475,70 +470,68 @@ function Invoke-OfficePlusNuke {
     # 注册表备份：把要删的项合并导出成一个 .reg 文件，误删时双击即可恢复
     $script:BackupFile = $null
     $backupFailed = @()
-    if (-not $NoBackup) {
-        $existingRegs = @($TargetRegistryKeys | Where-Object { Test-Path -LiteralPath $_ })
-        if ($existingRegs.Count -gt 0) {
-            $backupDir = Join-Path $UserDocuments "Remove-OfficePlus 备份"
-            $tempDir = Join-Path $env:TEMP ("OfficePLUS_backup_" + [guid]::NewGuid())
-            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-            $header = "Windows Registry Editor Version 5.00"
-            $merged = New-Object System.Collections.Generic.List[string]
-            $merged.Add($header)
-            $i = 0
-            foreach ($reg in $existingRegs) {
-                $rawRegPath = $reg -replace '^HKLM:\\', 'HKLM\' -replace '^HKCU:\\', 'HKCU\' -replace '^Registry::HKEY_USERS\\', 'HKU\'
-                $part = Join-Path $tempDir "$i.reg"
-                $null = & "$Sys32\reg.exe" export "$rawRegPath" "$part" /y /reg:64 2>&1
-                if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $part)) {
-                    $merged.Add("")
-                    $merged.AddRange([string[]](Get-Content -LiteralPath $part -Encoding Unicode | Where-Object { $_ -ne $header }))
-                } else {
-                    $backupFailed += $reg
-                    Write-Warn "注册表项备份失败，为安全起见本次不删除它: $reg"
-                }
-                $i++
+    $existingRegs = @($TargetRegistryKeys | Where-Object { Test-Path -LiteralPath $_ })
+    if ($existingRegs.Count -gt 0) {
+        $backupDir = Join-Path $UserDocuments "Remove-OfficePlus 备份"
+        $tempDir = Join-Path $env:TEMP ("OfficePLUS_backup_" + [guid]::NewGuid())
+        New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+        $header = "Windows Registry Editor Version 5.00"
+        $merged = New-Object System.Collections.Generic.List[string]
+        $merged.Add($header)
+        $i = 0
+        foreach ($reg in $existingRegs) {
+            $rawRegPath = $reg -replace '^HKLM:\\', 'HKLM\' -replace '^HKCU:\\', 'HKCU\' -replace '^Registry::HKEY_USERS\\', 'HKU\'
+            $part = Join-Path $tempDir "$i.reg"
+            $null = & "$Sys32\reg.exe" export "$rawRegPath" "$part" /y /reg:64 2>&1
+            if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $part)) {
+                $merged.Add("")
+                $merged.AddRange([string[]](Get-Content -LiteralPath $part -Encoding Unicode | Where-Object { $_ -ne $header }))
+            } else {
+                $backupFailed += $reg
+                Write-Warn "注册表项备份失败，为安全起见本次不删除它: $reg"
             }
-            Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
-            if ($merged.Count -gt 1) {
-                try {
-                    # 备份文件夹是联接/符号链接时拒绝写入，宁可这次不清注册表
-                    if (Test-ReparsePoint $backupDir) { throw "备份文件夹是联接或符号链接，拒绝写入: $backupDir" }
-                    New-Item -ItemType Directory -Path $backupDir -Force -ErrorAction Stop | Out-Null
-                    # 同一秒内多次备份时加 _2、_3 后缀，绝不覆盖以前的备份
-                    $stem = "OfficePLUS_注册表备份_" + (Get-Date).ToString("yyyyMMdd_HHmmss")
-                    $backupPath = Join-Path $backupDir "$stem.reg"
-                    $n = 2
-                    while (Test-Path -LiteralPath $backupPath) {
-                        $backupPath = Join-Path $backupDir "${stem}_$n.reg"
-                        $n++
-                    }
-                    try {
-                        Set-Content -LiteralPath $backupPath -Value $merged -Encoding Unicode -ErrorAction Stop
-                    } catch {
-                        # 写了一半的文件不能留下来冒充备份
-                        Remove-Item -LiteralPath $backupPath -Force -ErrorAction SilentlyContinue
-                        throw
-                    }
-                    $script:BackupFile = $backupPath
-                    Write-Success "已备份 $($existingRegs.Count - $backupFailed.Count) 项注册表到: $($script:BackupFile)"
-                    # 在备份文件夹里放一份恢复说明，只写一次；写不进去也不影响清理
-                    $notePath = Join-Path $backupDir "如何恢复.txt"
-                    if (-not (Test-Path -LiteralPath $notePath)) {
-                        try {
-                            [IO.File]::WriteAllText($notePath, $RestoreNote, (New-Object System.Text.UTF8Encoding $true))
-                        } catch {
-                            Write-Verbose "恢复说明写入失败: $($_.Exception.Message)"
-                        }
-                    }
-                } catch {
-                    # 备份文件写不进去（文件夹无权限、磁盘满等）：一项都不删，宁可这次不清注册表
-                    Write-Warn "注册表备份文件写入失败（$($_.Exception.Message)），为安全起见本次不删除任何注册表项。"
-                    $backupFailed = $existingRegs
-                }
-            }
-        } else {
-            Write-Info "未发现需备份的注册表项。"
+            $i++
         }
+        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        if ($merged.Count -gt 1) {
+            try {
+                # 备份文件夹是联接/符号链接时拒绝写入，宁可这次不清注册表
+                if (Test-ReparsePoint $backupDir) { throw "备份文件夹是联接或符号链接，拒绝写入: $backupDir" }
+                New-Item -ItemType Directory -Path $backupDir -Force -ErrorAction Stop | Out-Null
+                # 同一秒内多次备份时加 _2、_3 后缀，绝不覆盖以前的备份
+                $stem = "OfficePLUS_注册表备份_" + (Get-Date).ToString("yyyyMMdd_HHmmss")
+                $backupPath = Join-Path $backupDir "$stem.reg"
+                $n = 2
+                while (Test-Path -LiteralPath $backupPath) {
+                    $backupPath = Join-Path $backupDir "${stem}_$n.reg"
+                    $n++
+                }
+                try {
+                    Set-Content -LiteralPath $backupPath -Value $merged -Encoding Unicode -ErrorAction Stop
+                } catch {
+                    # 写了一半的文件不能留下来冒充备份
+                    Remove-Item -LiteralPath $backupPath -Force -ErrorAction SilentlyContinue
+                    throw
+                }
+                $script:BackupFile = $backupPath
+                Write-Success "已备份 $($existingRegs.Count - $backupFailed.Count) 项注册表到: $($script:BackupFile)"
+                # 在备份文件夹里放一份恢复说明，只写一次；写不进去也不影响清理
+                $notePath = Join-Path $backupDir "如何恢复.txt"
+                if (-not (Test-Path -LiteralPath $notePath)) {
+                    try {
+                        [IO.File]::WriteAllText($notePath, $RestoreNote, (New-Object System.Text.UTF8Encoding $true))
+                    } catch {
+                        Write-Verbose "恢复说明写入失败: $($_.Exception.Message)"
+                    }
+                }
+            } catch {
+                # 备份文件写不进去（文件夹无权限、磁盘满等）：一项都不删，宁可这次不清注册表
+                Write-Warn "注册表备份文件写入失败（$($_.Exception.Message)），为安全起见本次不删除任何注册表项。"
+                $backupFailed = $existingRegs
+            }
+        }
+    } else {
+        Write-Info "未发现需备份的注册表项。"
     }
 
     # 1. 终止所有占用进程

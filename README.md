@@ -120,7 +120,6 @@ python main.py --version
 | — | `--dry-run` | 预演：列出清理时会删除的每一项，不做任何修改 |
 | `-Nuke` | `--nuke` | 执行清理。Python 版会先列出要删的项目并询问确认；Office 在运行时两者都会先提醒保存 |
 | `-Force` | `-f` / `--yes` | 跳过确认，直接清理 |
-| `-NoBackup` | — | 不备份注册表（不建议） |
 | — | `--version` | 显示版本号 |
 
 Python 版不带参数时启动图形界面。
