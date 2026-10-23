@@ -1,4 +1,5 @@
 import os
+from .user_context import get_target_user
 
 # OfficePLUS 自身的进程：扫描时算作威胁
 OFFICEPLUS_PROCESSES = [
@@ -48,8 +49,10 @@ TARGET_REGISTRY_KEYS = [
 ]
 
 def get_target_directories():
-    local_app_data = os.environ.get("LOCALAPPDATA", "")
-    app_data = os.environ.get("APPDATA", "")
+    # 用户目录取“实际要清理的用户”的，避免用其他管理员账号提权时清错人
+    user = get_target_user()
+    local_app_data = user.local_appdata
+    app_data = user.roaming_appdata
     program_data = os.environ.get("ProgramData", r"C:\ProgramData")
     program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
     program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")

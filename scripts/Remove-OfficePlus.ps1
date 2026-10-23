@@ -83,6 +83,71 @@ function Elevate-Privileges {
 }
 
 # ==========================================
+# 0.5 确定要清理哪个用户
+# ==========================================
+# 普通用户运行时，UAC 会让输入另一个管理员账号的密码，脚本随后以那个管理员身份运行，
+# HKCU 和 %APPDATA% 都会指向管理员自己。这里找出当前桌面会话的登录用户，
+# 和当前运行账号不同时改为清理他的数据；有任何不确定就返回 $null，按原来的方式处理当前用户。
+function Get-TargetUser {
+    try {
+        if (-not ("RemoveOfficePlus.Wts" -as [type])) {
+            Add-Type -Namespace RemoveOfficePlus -Name Wts -MemberDefinition @"
+[DllImport("wtsapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+public static extern bool WTSQuerySessionInformationW(IntPtr server, int sessionId, int infoClass, out IntPtr buffer, out int bytes);
+[DllImport("wtsapi32.dll")]
+public static extern void WTSFreeMemory(IntPtr memory);
+public static string Query(int sessionId, int infoClass) {
+    IntPtr buffer; int bytes;
+    if (!WTSQuerySessionInformationW(IntPtr.Zero, sessionId, infoClass, out buffer, out bytes)) { return ""; }
+    try { return Marshal.PtrToStringUni(buffer); } finally { WTSFreeMemory(buffer); }
+}
+"@
+        }
+        $sessionId = (Get-Process -Id $PID).SessionId
+        $user = [RemoveOfficePlus.Wts]::Query($sessionId, 5)    # WTSUserName
+        $domain = [RemoveOfficePlus.Wts]::Query($sessionId, 7)  # WTSDomainName
+        if (-not $user) { return $null }
+        $account = if ($domain) { "$domain\$user" } else { $user }
+        $sid = (New-Object Security.Principal.NTAccount($account)).Translate([Security.Principal.SecurityIdentifier]).Value
+        if (-not $sid -or $sid -eq [Security.Principal.WindowsIdentity]::GetCurrent().User.Value) { return $null }
+        # 登录用户的注册表必须已加载（他正登录着），并且能找到他的个人文件夹
+        if (-not (Test-Path -LiteralPath "Registry::HKEY_USERS\$sid")) { return $null }
+        $userProfile = [Environment]::ExpandEnvironmentVariables((Get-ItemProperty -LiteralPath "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid").ProfileImagePath)
+        if (-not $userProfile -or -not (Test-Path -LiteralPath $userProfile)) { return $null }
+        $folders = Get-Item -LiteralPath "Registry::HKEY_USERS\$sid\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" -ErrorAction SilentlyContinue
+        $folder = {
+            param($name, $default)
+            $value = if ($folders) { $folders.GetValue($name, $null, 'DoNotExpandEnvironmentNames') }
+            if ($value) { $value = $value -replace '%USERPROFILE%', $userProfile.Replace('$', '$$') }
+            if (-not $value -or $value -match '%') { $value = Join-Path $userProfile $default }
+            $value
+        }
+        return [pscustomobject]@{
+            Sid          = $sid
+            Name         = $user
+            LocalAppData = & $folder "Local AppData" "AppData\Local"
+            AppData      = & $folder "AppData" "AppData\Roaming"
+            Documents    = & $folder "Personal" "Documents"
+        }
+    } catch {
+        return $null
+    }
+}
+
+$TargetUser = Get-TargetUser
+if ($TargetUser) {
+    $UserRegRoot = "Registry::HKEY_USERS\$($TargetUser.Sid)"
+    $UserLocalAppData = $TargetUser.LocalAppData
+    $UserAppData = $TargetUser.AppData
+    $UserDocuments = $TargetUser.Documents
+} else {
+    $UserRegRoot = "HKCU:"
+    $UserLocalAppData = $env:LOCALAPPDATA
+    $UserAppData = $env:APPDATA
+    $UserDocuments = [Environment]::GetFolderPath("MyDocuments")
+}
+
+# ==========================================
 # 1. 目标组件定义
 # ==========================================
 # OfficePLUS 自身的进程：扫描时算作威胁
@@ -121,22 +186,22 @@ $TargetRegistryKeys = @(
     "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS",
     "HKLM:\Software\Microsoft\OfficePLUS",
     "HKLM:\Software\Wow6432Node\Microsoft\OfficePLUS",
-    "HKCU:\Software\Microsoft\Office\Word\Addins\MSOfficePLUS",
-    "HKCU:\Software\Microsoft\Office\Excel\Addins\MSOfficePLUS",
-    "HKCU:\Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS",
-    "HKCU:\Software\Microsoft\Office\Outlook\Addins\MSOfficePLUS",
-    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS",
-    "HKCU:\Software\Microsoft\OfficePLUS"
+    "$UserRegRoot\Software\Microsoft\Office\Word\Addins\MSOfficePLUS",
+    "$UserRegRoot\Software\Microsoft\Office\Excel\Addins\MSOfficePLUS",
+    "$UserRegRoot\Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS",
+    "$UserRegRoot\Software\Microsoft\Office\Outlook\Addins\MSOfficePLUS",
+    "$UserRegRoot\Software\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS",
+    "$UserRegRoot\Software\Microsoft\OfficePLUS"
 )
 
 $TargetDirectories = @(
     "C:\Program Files\Microsoft OfficePLUS",
     "C:\Program Files (x86)\Microsoft OfficePLUS",
     "C:\ProgramData\Microsoft OfficePLUS",
-    "$env:LOCALAPPDATA\OfficePLUS",
-    "$env:LOCALAPPDATA\Microsoft OfficePLUS",
-    "$env:APPDATA\OfficePLUS",
-    "$env:APPDATA\Microsoft OfficePLUS"
+    "$UserLocalAppData\OfficePLUS",
+    "$UserLocalAppData\Microsoft OfficePLUS",
+    "$UserAppData\OfficePLUS",
+    "$UserAppData\Microsoft OfficePLUS"
 )
 
 # ==========================================
@@ -183,6 +248,9 @@ function Invoke-OfficePlusScan {
     Write-Step "正在进行系统环境全面排查扫描..."
 
     $foundItems = 0
+    if ($TargetUser) {
+        Write-Info "当前以其他管理员账号运行，将检查和清理登录用户「$($TargetUser.Name)」的个人设置与文件。"
+    }
 
     # 1. 检测运行进程
     Write-Host "`n[1] 进程检测：" -ForegroundColor Cyan
@@ -290,7 +358,7 @@ function Invoke-OfficePlusNuke {
     if (-not $NoBackup) {
         $existingRegs = @($TargetRegistryKeys | Where-Object { Test-Path $_ })
         if ($existingRegs.Count -gt 0) {
-            $backupDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Remove-OfficePlus 备份"
+            $backupDir = Join-Path $UserDocuments "Remove-OfficePlus 备份"
             New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
             $tempDir = Join-Path $env:TEMP ("OfficePLUS_backup_" + [guid]::NewGuid())
             New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
@@ -299,7 +367,7 @@ function Invoke-OfficePlusNuke {
             $merged.Add($header)
             $i = 0
             foreach ($reg in $existingRegs) {
-                $rawRegPath = $reg -replace '^HKLM:\\', 'HKLM\' -replace '^HKCU:\\', 'HKCU\'
+                $rawRegPath = $reg -replace '^HKLM:\\', 'HKLM\' -replace '^HKCU:\\', 'HKCU\' -replace '^Registry::HKEY_USERS\\', 'HKU\'
                 $part = Join-Path $tempDir "$i.reg"
                 $null = & reg.exe export "$rawRegPath" "$part" /y /reg:64 2>&1
                 if ($LASTEXITCODE -eq 0 -and (Test-Path $part)) {

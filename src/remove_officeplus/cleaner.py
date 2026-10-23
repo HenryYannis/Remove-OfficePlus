@@ -8,6 +8,7 @@ from typing import List, Tuple
 from .constants import TARGET_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, get_target_directories
 from .scanner import is_admin
 from .backup import backup_registry
+from .user_context import resolve_key
 
 # 最近一次清理生成的注册表备份文件路径（没有可备份的项时为 None）
 LAST_BACKUP_PATH = None
@@ -92,18 +93,14 @@ def _reg_key_exists(root, subkey) -> bool:
 def clean_registry(skip=()) -> List[str]:
     """删除目标注册表项。skip 中的项（备份失败的）不删，避免无法恢复。"""
     cleaned = []
-    root_map = {
-        "HKLM": winreg.HKEY_LOCAL_MACHINE,
-        "HKCU": winreg.HKEY_CURRENT_USER,
-    }
-    for subkey, root_name in TARGET_REGISTRY_KEYS:
-        root = root_map.get(root_name)
-        if not root or (subkey, root_name) in skip:
+    for key, root_name in TARGET_REGISTRY_KEYS:
+        if (key, root_name) in skip:
             continue
+        root, subkey, reg_path = resolve_key(key, root_name)
         if _reg_key_exists(root, subkey):
             _delete_reg_key_tree(root, subkey)
             if not _reg_key_exists(root, subkey):  # 删完复查，真的没了才算成功
-                cleaned.append(f"{root_name}\\{subkey}")
+                cleaned.append(reg_path)
     return cleaned
 
 def clean_scheduled_tasks() -> List[str]:
@@ -158,8 +155,7 @@ def run_nuke() -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
     elevate()
     procs = kill_processes()
     svcs = delete_services()
-    root_map = {"HKLM": winreg.HKEY_LOCAL_MACHINE, "HKCU": winreg.HKEY_CURRENT_USER}
-    existing = [(k, r) for k, r in TARGET_REGISTRY_KEYS if _reg_key_exists(root_map[r], k)]
+    existing = [(k, r) for k, r in TARGET_REGISTRY_KEYS if _reg_key_exists(*resolve_key(k, r)[:2])]
     LAST_BACKUP_PATH, backup_failed = backup_registry(existing)
     regs = clean_registry(skip=backup_failed)
     tasks = clean_scheduled_tasks()

@@ -4,6 +4,7 @@ import subprocess
 import ctypes
 from dataclasses import dataclass, field
 from typing import List
+from .user_context import resolve_key
 from .constants import OFFICEPLUS_PROCESSES, OFFICE_APP_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, get_target_directories
 
 @dataclass
@@ -68,21 +69,15 @@ def scan_services() -> List[str]:
 
 def scan_registry() -> List[str]:
     found = []
-    root_map = {
-        "HKLM": winreg.HKEY_LOCAL_MACHINE,
-        "HKCU": winreg.HKEY_CURRENT_USER,
-    }
-    for subkey, root_name in TARGET_REGISTRY_KEYS:
-        root = root_map.get(root_name)
-        if not root:
-            continue
+    for key, root_name in TARGET_REGISTRY_KEYS:
+        root, subkey, reg_path = resolve_key(key, root_name)
         try:
             with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ):
-                found.append(f"{root_name}\\{subkey}")
+                found.append(reg_path)
         except FileNotFoundError:
             pass
         except PermissionError:
-            found.append(f"{root_name}\\{subkey} [需管理员权限读取]")
+            found.append(f"{reg_path} [需管理员权限读取]")
         except Exception:
             pass
     return found

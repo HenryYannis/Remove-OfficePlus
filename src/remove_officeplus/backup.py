@@ -1,26 +1,20 @@
 """清理前把要删除的注册表项导出成一个 .reg 文件，误删时双击它就能恢复。"""
-import ctypes
 import os
 import subprocess
 import tempfile
 from datetime import datetime
 from typing import Iterable, Optional, Set, Tuple
 
+from .user_context import get_target_user, resolve_key
+
 BACKUP_FOLDER_NAME = "Remove-OfficePlus 备份"
 REG_HEADER = "Windows Registry Editor Version 5.00"
 
 
 def get_backup_dir() -> str:
-    """备份放在“文档”文件夹里，用户容易找到。"""
-    try:
-        buf = ctypes.create_unicode_buffer(260)
-        ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf)  # 5 = 我的文档
-        docs = buf.value
-    except Exception:
-        docs = ""
-    if not docs:
-        docs = os.path.join(os.path.expanduser("~"), "Documents")
-    return os.path.join(docs, BACKUP_FOLDER_NAME)
+    """备份放在“文档”文件夹里，用户容易找到。
+    用其他管理员账号提权时，放进正在用电脑的那个用户的文档。"""
+    return os.path.join(get_target_user().documents, BACKUP_FOLDER_NAME)
 
 
 def backup_registry(keys: Iterable[Tuple[str, str]]) -> Tuple[Optional[str], Set[Tuple[str, str]]]:
@@ -38,7 +32,7 @@ def backup_registry(keys: Iterable[Tuple[str, str]]) -> Tuple[Optional[str], Set
         for i, (subkey, root_name) in enumerate(keys):
             part = os.path.join(tmp, f"{i}.reg")
             res = subprocess.run(
-                ["reg.exe", "export", f"{root_name}\\{subkey}", part, "/y", "/reg:64"],
+                ["reg.exe", "export", resolve_key(subkey, root_name)[2], part, "/y", "/reg:64"],
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
