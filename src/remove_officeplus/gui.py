@@ -1,4 +1,3 @@
-import os
 import sys
 import ctypes
 import threading
@@ -8,6 +7,7 @@ from tkinter import ttk, messagebox, scrolledtext
 from typing import Optional
 
 from . import __version__, DOWNLOAD_URL
+from . import cleaner, runlog
 from .scanner import run_scan, is_admin, ScanReport
 from .cleaner import run_nuke, elevate
 
@@ -19,6 +19,37 @@ except Exception:
         ctypes.windll.user32.SetProcessDPIAware()
     except Exception:
         pass
+
+
+def summarize_nuke(cleaned_total: int, report: Optional[ScanReport],
+                   backup_path: Optional[str], log_path: Optional[str]):
+    """根据清理返回值和复检结果，决定完成弹窗的级别、标题和正文。
+
+    返回 (level, title, message)，level 为 "success" / "partial" / "failure"。
+    复检没跑成（report 为 None）时不能当作成功。
+    """
+    if report is not None and report.is_clean:
+        level, title = "success", "清理完成"
+        text = "微软 OfficePLUS 及关联组件已全部清除，复检未发现残留。"
+    elif report is not None and cleaned_total > 0:
+        level, title = "partial", "部分完成"
+        text = (f"已清理 {cleaned_total} 项，但复检仍发现 {report.total_threats} 处残留没能删除。\n"
+                "建议重启电脑后再运行一次；仍然删不掉的话，欢迎到 GitHub 提交 Issue。")
+    else:
+        level, title = "failure", "清理失败"
+        if report is None:
+            text = "清理后复检出错，无法确认清理结果。"
+        else:
+            text = f"本次没有清理掉任何项，复检仍发现 {report.total_threats} 处残留。"
+        text += "\n请查看清理日志了解原因。"
+    lines = [text]
+    if backup_path:
+        lines.append(f"\n注册表备份：{backup_path}\n（误删了需要的设置时，双击这个文件即可恢复）")
+    if log_path:
+        lines.append(f"\n清理日志：{log_path}")
+    elif level != "success":
+        lines.append("\n清理日志没能保存。")
+    return level, title, "\n".join(lines)
 
 
 class ModernGUI(tk.Tk):
@@ -137,15 +168,16 @@ class ModernGUI(tk.Tk):
             )
             perm_label.pack(side="left", fill="x", expand=True)
 
-        # ================= 2. 状态统计卡片区 (4个指标) =================
+        # ================= 2. 状态统计卡片区 (5个指标) =================
         stats_frame = ttk.Frame(self, style="TFrame")
         stats_frame.pack(fill="x", padx=16, pady=4)
-        stats_frame.columnconfigure((0, 1, 2, 3), weight=1, uniform="col")
+        stats_frame.columnconfigure((0, 1, 2, 3, 4), weight=1, uniform="col")
 
         self.card_proc_val = self._create_stat_card(stats_frame, 0, "运行进程", "0")
         self.card_svc_val = self._create_stat_card(stats_frame, 1, "常驻服务", "0")
         self.card_reg_val = self._create_stat_card(stats_frame, 2, "注册表项", "0")
-        self.card_dir_val = self._create_stat_card(stats_frame, 3, "残留目录", "0")
+        self.card_task_val = self._create_stat_card(stats_frame, 3, "计划任务", "0")
+        self.card_dir_val = self._create_stat_card(stats_frame, 4, "残留目录", "0")
 
         # ================= 3. 核心控制按钮与状态区 (整体居中对称布局) =================
         control_container = ttk.Frame(self, style="TFrame")
@@ -271,7 +303,18 @@ class ModernGUI(tk.Tk):
         self.log_text.see(tk.END)
 
     def _do_elevate(self):
-        elevate()
+        # 提权成功时 elevate() 会重新启动并退出当前进程；走到下面说明没能提权
+        try:
+            ok = elevate()
+        except Exception as e:
+            messagebox.showerror("提权失败", f"以管理员身份重新启动时出错：{e!r}")
+            return
+        if not ok:
+            messagebox.showwarning(
+                "未获得管理员权限",
+                "没有获得管理员权限（可能在 UAC 提示中选择了「否」）。\n\n"
+                "当前仍以普通权限运行，可以扫描，但无法彻底清理服务与系统级注册表。"
+            )
 
     def set_buttons_state(self, enabled: bool):
         state = tk.NORMAL if enabled else tk.DISABLED
@@ -308,6 +351,10 @@ class ModernGUI(tk.Tk):
             text=str(len(report.registry_keys)),
             fg="#EF4444" if report.registry_keys else "#10B981"
         )
+        self.card_task_val.config(
+            text=str(len(report.scheduled_tasks)),
+            fg="#EF4444" if report.scheduled_tasks else "#10B981"
+        )
         self.card_dir_val.config(
             text=str(len(report.directories)),
             fg="#EF4444" if report.directories else "#10B981"
@@ -331,6 +378,12 @@ class ModernGUI(tk.Tk):
                 self.log(f"  [-] 发现注册表项: {r}", "danger")
         else:
             self.log("  [+] 未发现任何 OfficePLUS 相关注册表项。", "success")
+
+        if report.scheduled_tasks:
+            for t in report.scheduled_tasks:
+                self.log(f"  [-] 发现计划任务: {t}", "danger")
+        else:
+            self.log("  [+] 未发现 OfficePLUS 相关计划任务。", "success")
 
         if report.directories:
             for d in report.directories:
@@ -362,22 +415,54 @@ class ModernGUI(tk.Tk):
         self.log(">>> 开始清理……", "warn")
 
         def _worker():
-            procs, svcs, regs, tasks, dirs = run_nuke()
-            self.after(0, lambda: self._on_nuke_finished(procs, svcs, regs, tasks, dirs))
+            # 清理后紧接着复检，按复检结果判断成功与否；任何一步出错都要回到界面，不能卡住
+            procs, svcs, regs, tasks, dirs = [], [], [], [], []
+            report = None
+            try:
+                procs, svcs, regs, tasks, dirs = run_nuke()
+                report = run_scan()
+            except Exception as e:
+                print(f"[!] 清理或复检出错：{e!r}", file=sys.stderr)
+            self.after(0, lambda: self._on_nuke_finished(procs, svcs, regs, tasks, dirs, report))
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _on_nuke_finished(self, procs, svcs, regs, tasks, dirs):
-        self.log("  [+] 已终止相关进程", "success")
-        self.log("  [+] 已注销并清理相关服务", "success")
-        self.log(f"  [+] 已清理 {len(regs)} 项注册表加载项", "success")
-        self.log(f"  [+] 已清理 {len(tasks)} 项计划任务", "success")
-        self.log(f"  [+] 已删除 {len(dirs)} 处程序与缓存目录", "success")
-        self.log("[完成] 微软 OfficePLUS 及关联组件已清理完成。", "success")
+    def _on_nuke_finished(self, procs, svcs, regs, tasks, dirs, report: Optional[ScanReport] = None):
+        cleaned = [
+            (procs, "个相关进程", "已结束"),
+            (svcs, "个后台服务", "已删除"),
+            (regs, "项注册表加载项", "已清理"),
+            (tasks, "项计划任务", "已清理"),
+            (dirs, "处程序与缓存目录", "已删除"),
+        ]
+        for items, unit, verb in cleaned:
+            self.log(f"  [+] {verb} {len(items)} {unit}", "success" if items else "muted")
+        cleaned_total = sum(len(items) for items, _, _ in cleaned)
+
+        backup_path = cleaner.LAST_BACKUP_PATH
+        log_path = runlog.LAST_LOG_PATH
+        level, title, message = summarize_nuke(cleaned_total, report, backup_path, log_path)
+        if backup_path:
+            self.log(f"  [*] 注册表备份: {backup_path}", "info")
+        if log_path:
+            self.log(f"  [*] 清理日志: {log_path}", "info")
+        tag = {"success": "success", "partial": "warn", "failure": "danger"}[level]
+        self.log(f"[{title}] " + message.split("\n", 1)[0], tag)
         self.log("==================================================\n", "muted")
 
-        messagebox.showinfo("清理完成", "微软 OfficePLUS 及关联组件已清理完成。\n现在系统将自动进行一次复检。")
-        self.start_scan()
+        if report is not None:
+            self.log(">>> 清理后复检结果：", "info")
+            self._on_scan_finished(report)
+        else:
+            self.set_buttons_state(True)
+            self.status_label.config(text="清理后复检出错，请重新排查扫描")
+
+        if level == "success":
+            messagebox.showinfo(title, message)
+        elif level == "partial":
+            messagebox.showwarning(title, message)
+        else:
+            messagebox.showerror(title, message)
 
 
 def launch_gui():

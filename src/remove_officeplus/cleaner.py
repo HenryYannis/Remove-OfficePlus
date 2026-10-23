@@ -5,12 +5,14 @@ import winreg
 import subprocess
 import ctypes
 from typing import List, Tuple
-from .constants import TARGET_PROCESSES, get_target_directories
+from .constants import OFFICEPLUS_PROCESSES, OFFICEPLUS_KEYWORD, TARGET_PROCESSES, get_target_directories
 from .scanner import is_admin, list_scheduled_tasks, is_officeplus_task
 from .backup import backup_registry, get_backup_dir
 from . import runlog
 from .user_context import resolve_key
 from .discovery import get_registry_keys, get_services
+from .winutil import (COMMAND_TIMEOUT, current_session_id, is_officeplus_image, list_processes,
+                      process_path, system_exe)
 
 # 32 位程序（如 32 位 exe）访问 HKLM\Software 会被重定向到 Wow6432Node，
 # 一律指定 64 位视图；32 位那份由规则里的 Wow6432Node 路径单独覆盖
@@ -53,39 +55,64 @@ def elevate() -> bool:
     print("[!] 没有获得管理员权限（可能在 UAC 提示中选择了「否」）。", file=sys.stderr)
     return False
 
+def _run(args):
+    """运行系统命令：不读标准输入（不会等用户输入 Y/N），超时会抛 TimeoutExpired，由调用方记进日志。"""
+    return subprocess.run(
+        args,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+        stdin=subprocess.DEVNULL,
+        capture_output=True, text=True, errors="replace",
+        timeout=COMMAND_TIMEOUT,
+    )
+
 def kill_processes() -> List[str]:
+    """结束 OfficePLUS 进程和占用加载项文件的 Office 程序。
+
+    - Word/Excel 等正常的 Office 程序只结束当前会话（当前登录用户）里的，
+      不碰同一台电脑上其他用户的 Office，避免他们没保存的文档丢失；
+    - OfficePLUS 自己的进程（服务进程在会话 0）不分会话，但要核对程序路径在 OfficePLUS 的文件夹里，
+      路径读不到就不结束，避免误杀其他软件的同名进程。
+    """
     killed = []
-    for proc in TARGET_PROCESSES:
-        try:
-            res = subprocess.run(
-                ["taskkill", "/F", "/IM", proc],
-                creationflags=subprocess.CREATE_NO_WINDOW,
-                capture_output=True, text=True, errors="replace"
-            )
-            if res.returncode == 0:  # 没在运行或结束失败都不算
-                killed.append(proc)
-                runlog.add(f"已结束进程: {proc}")
-            elif res.returncode != 128:  # 128 = 没有这个进程
-                runlog.add(f"[失败] 结束进程 {proc}: {runlog.output_text(res)}")
-        except Exception as e:
-            runlog.add(f"[失败] 结束进程 {proc}: {e}")
+    try:
+        procs = list_processes()
+    except Exception as e:
+        runlog.add(f"[失败] 读取进程列表: {e}")
+        return killed
+    my_session = current_session_id()
+    officeplus = {p.lower() for p in OFFICEPLUS_PROCESSES}
+    for target in TARGET_PROCESSES:
+        for proc in procs:
+            if proc.name.lower() != target.lower():
+                continue
+            label = f"{proc.name} (PID: {proc.pid})"
+            if target.lower() in officeplus:
+                path = process_path(proc.pid)
+                if not is_officeplus_image(path, OFFICEPLUS_KEYWORD):
+                    runlog.add(f"[跳过] 进程 {label} 的程序路径不属于 OfficePLUS，未结束: {path or '路径未知'}")
+                    continue
+            elif my_session is None or proc.session != my_session:
+                runlog.add(f"[跳过] 进程 {label} 不在当前会话（其他用户的 Office），未结束")
+                continue
+            try:
+                res = _run([system_exe("taskkill.exe"), "/F", "/PID", str(proc.pid)])
+                if res.returncode == 0:
+                    if target not in killed:
+                        killed.append(target)
+                    runlog.add(f"已结束进程: {label}")
+                elif res.returncode != 128:  # 128 = 进程已经不在了
+                    runlog.add(f"[失败] 结束进程 {label}: {runlog.output_text(res)}")
+            except Exception as e:
+                runlog.add(f"[失败] 结束进程 {label}: {e}")
     return killed
 
 def delete_services() -> List[str]:
     removed = []
     for svc in get_services():
         try:
-            subprocess.run(
-                ["net", "stop", svc],
-                creationflags=subprocess.CREATE_NO_WINDOW,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            res = subprocess.run(
-                ["sc.exe", "delete", svc],
-                creationflags=subprocess.CREATE_NO_WINDOW,
-                capture_output=True, text=True, errors="replace"
-            )
+            # /y：有依赖服务时自动确认，不等用户输入
+            _run([system_exe("net.exe"), "stop", svc, "/y"])
+            res = _run([system_exe("sc.exe"), "delete", svc])
             if res.returncode == 0:
                 removed.append(svc)
                 runlog.add(f"已删除服务: {svc}")
@@ -159,11 +186,11 @@ def clean_scheduled_tasks() -> List[str]:
     for task_name in task_names:
         if not is_officeplus_task(task_name):
             continue
-        res = subprocess.run(
-            ["schtasks", "/Delete", "/TN", task_name, "/F"],
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            capture_output=True, text=True, errors="replace"
-        )
+        try:
+            res = _run([system_exe("schtasks.exe"), "/Delete", "/TN", task_name, "/F"])
+        except Exception as e:
+            runlog.add(f"[失败] 删除计划任务 {task_name}: {e}")
+            continue
         if res.returncode == 0:
             cleaned.append(task_name)
             runlog.add(f"已删除计划任务: {task_name}")
@@ -206,12 +233,13 @@ def run_nuke() -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
     procs, svcs, regs, tasks, dirs = [], [], [], [], []
     runlog.start()
     try:
-        procs = kill_processes()
-        svcs = delete_services()
+        # 先备份注册表再动手（和 PowerShell 版顺序一致）
         existing = [(k, r) for k, r in get_registry_keys() if _reg_key_exists(*resolve_key(k, r)[:2])]
         LAST_BACKUP_PATH, backup_failed = backup_registry(existing)
         if LAST_BACKUP_PATH:
             runlog.add(f"注册表备份: {LAST_BACKUP_PATH}")
+        procs = kill_processes()
+        svcs = delete_services()
         regs = clean_registry(skip=backup_failed, keys=existing)
         tasks = clean_scheduled_tasks()
         dirs = delete_directories()

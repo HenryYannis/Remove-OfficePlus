@@ -31,11 +31,10 @@ python build_exe.py                   # 打包 exe 和 SHA256SUMS.txt（需要 p
 5. **规则只改 `rules.json`**，然后运行 `sync_rules.py`；最好附上真实安装的注册表导出作为依据。
 6. **编码**：`Remove-OfficePlus.ps1` 保持 UTF-8 带 BOM（PowerShell 5.1 才能正确读中文）；`Quick-Remove.bat` 保持纯 ASCII + CRLF。
 7. **兼容性**：Windows 10/11；PowerShell 5.1 和 7+；Python 3.8+。
-8. **不改 `gui.py`**：图形界面需要的改进放在它调用的核心代码里。
 
 ## 提交流程
 
-- 每个问题一个分支和一个 PR，CI 和 E2E 全绿后再合并，合并后删除分支，仓库只保留 `main`。
+- CI 和 E2E 全绿后再合并，合并后删除分支，仓库只保留 `main`。
 - 提交信息和 PR 描述用第一人称写清楚：遇到的问题、我的改动、怎么测试的。
 
 ## 发布流程

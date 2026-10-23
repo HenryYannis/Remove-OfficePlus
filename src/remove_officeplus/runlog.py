@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from . import __version__
+from .winutil import is_reparse_point
 
 _lines: List[str] = []
 # 最近一次清理的日志文件路径（没写成功时为 None）
@@ -41,6 +42,8 @@ def save(folder: str) -> Optional[str]:
     """写入 folder\\清理日志_时间.txt，同一秒多次运行时加 _2、_3，不覆盖旧日志。"""
     global LAST_LOG_PATH
     try:
+        if is_reparse_point(folder):  # 联接/符号链接：不写，免得管理员把文件写到别处
+            raise OSError(f"日志文件夹是联接或符号链接，拒绝写入: {folder}")
         os.makedirs(folder, exist_ok=True)
         stem = f"清理日志_{datetime.now():%Y%m%d_%H%M%S}"
         n = 1

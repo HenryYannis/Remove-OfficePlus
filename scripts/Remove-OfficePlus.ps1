@@ -137,6 +137,13 @@ public static string Query(int sessionId, int infoClass) {
 }
 
 $TargetUser = Get-TargetUser
+
+# 系统命令一律用 System32 下的绝对路径，不靠 PATH 和当前目录查找同名程序
+$Sys32 = [Environment]::SystemDirectory
+# 32 位 PowerShell 在 64 位系统上，ProgramFiles 指向 Program Files (x86)；ProgramW6432 才是 64 位的
+$ProgramFiles64 = if ($env:ProgramW6432) { $env:ProgramW6432 } else { $env:ProgramFiles }
+# 当前会话号：清理时只关当前登录用户的 Office，不碰同一台电脑上其他用户的
+$MySessionId = (Get-Process -Id $PID).SessionId
 if ($TargetUser) {
     $UserRegRoot = "Registry::HKEY_USERS\$($TargetUser.Sid)"
     $UserLocalAppData = $TargetUser.LocalAppData
@@ -202,7 +209,7 @@ $TargetRegistryKeys = @(
 
 # 系统目录取环境变量（系统不一定装在 C 盘）；哪个位置取不到就跳过，不能拼成盘符根目录
 $TargetDirectories = @(
-    if ($env:ProgramFiles) { Join-Path $env:ProgramFiles "Microsoft OfficePLUS" }
+    if ($ProgramFiles64) { Join-Path $ProgramFiles64 "Microsoft OfficePLUS" }
     if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} "Microsoft OfficePLUS" }
     if ($env:ProgramData) { Join-Path $env:ProgramData "Microsoft OfficePLUS" }
     if ($UserLocalAppData) { Join-Path $UserLocalAppData "OfficePLUS" }
@@ -268,6 +275,22 @@ function Join-Unique {
     }
 }
 
+# OfficePLUS 自己的进程（DeepLink.exe 这类名字很常见）：程序路径读得到、却不在 OfficePLUS 的文件夹里，就不算
+function Test-OfficePlusProcess {
+    param($Process)
+    $path = $null
+    try { $path = $Process.Path } catch { $path = $null }
+    if (-not $path) { return $null }  # 读不到路径
+    return ((Split-Path -Parent $path) -like "*$AddinKeyword*")
+}
+
+# 联接、符号链接等重解析点
+function Test-ReparsePoint {
+    param([string]$Path)
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    return [bool]($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint))
+}
+
 $TargetRegistryKeys = @(Join-Unique (@($TargetRegistryKeys) + @(Find-OfficePlusAddins)))
 $TargetServices = @(Join-Unique (@($TargetServices) + @(Find-OfficePlusServices)))
 
@@ -321,7 +344,8 @@ function Invoke-OfficePlusScan {
 
     # 1. 检测运行进程
     Write-Host "`n[1] 进程检测：" -ForegroundColor Cyan
-    $runningProcs = Get-Process -Name $OfficePlusProcesses -ErrorAction SilentlyContinue
+    # 程序路径读不到时（例如未提权时的系统服务进程）照样报告，宁可多报
+    $runningProcs = @(Get-Process -Name $OfficePlusProcesses -ErrorAction SilentlyContinue | Where-Object { (Test-OfficePlusProcess $_) -ne $false })
     if ($runningProcs) {
         foreach ($p in $runningProcs) {
             Write-Danger "发现运行中进程: $($p.Name) (PID: $($p.Id))"
@@ -347,7 +371,7 @@ function Invoke-OfficePlusScan {
     Write-Host "`n[3] Office 加载项与注册表残留检测：" -ForegroundColor Cyan
     $foundRegCount = 0
     foreach ($reg in $TargetRegistryKeys) {
-        if (Test-Path $reg) {
+        if (Test-Path -LiteralPath $reg) {
             Write-Danger "发现注册表项: $reg"
             $foundRegCount++
             $foundItems++
@@ -373,7 +397,7 @@ function Invoke-OfficePlusScan {
     Write-Host "`n[5] 文件目录与缓存残留检测：" -ForegroundColor Cyan
     $foundDirCount = 0
     foreach ($dir in $TargetDirectories) {
-        if (Test-Path $dir) {
+        if (Test-Path -LiteralPath $dir) {
             Write-Danger "发现残留目录: $dir"
             $foundDirCount++
             $foundItems++
@@ -412,7 +436,7 @@ function Invoke-OfficePlusNuke {
 
     # 提醒用户先保存正在编辑的 Office 文档（-Force 时跳过）
     if (-not $Force) {
-        $openOffice = Get-Process -Name $OfficeAppProcesses -ErrorAction SilentlyContinue
+        $openOffice = @(Get-Process -Name $OfficeAppProcesses -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq $MySessionId })
         if ($openOffice) {
             $names = ($openOffice | Select-Object -ExpandProperty Name -Unique) -join "、"
             Write-Warn "检测到以下 Office 程序正在运行：$names"
@@ -430,6 +454,8 @@ function Invoke-OfficePlusNuke {
     $script:LogFile = $null
     try {
         $logDir = Join-Path $UserDocuments "Remove-OfficePlus 备份"
+        # 管理员身份往用户可控的「文档」里写：文件夹是联接/符号链接时不写，免得被引到系统目录里
+        if (Test-ReparsePoint $logDir) { throw "日志文件夹是联接或符号链接，拒绝写入: $logDir" }
         New-Item -ItemType Directory -Path $logDir -Force -ErrorAction Stop | Out-Null
         $stem = "清理日志_" + (Get-Date).ToString("yyyyMMdd_HHmmss")
         $logPath = Join-Path $logDir "$stem.txt"
@@ -450,7 +476,7 @@ function Invoke-OfficePlusNuke {
     $script:BackupFile = $null
     $backupFailed = @()
     if (-not $NoBackup) {
-        $existingRegs = @($TargetRegistryKeys | Where-Object { Test-Path $_ })
+        $existingRegs = @($TargetRegistryKeys | Where-Object { Test-Path -LiteralPath $_ })
         if ($existingRegs.Count -gt 0) {
             $backupDir = Join-Path $UserDocuments "Remove-OfficePlus 备份"
             $tempDir = Join-Path $env:TEMP ("OfficePLUS_backup_" + [guid]::NewGuid())
@@ -462,19 +488,21 @@ function Invoke-OfficePlusNuke {
             foreach ($reg in $existingRegs) {
                 $rawRegPath = $reg -replace '^HKLM:\\', 'HKLM\' -replace '^HKCU:\\', 'HKCU\' -replace '^Registry::HKEY_USERS\\', 'HKU\'
                 $part = Join-Path $tempDir "$i.reg"
-                $null = & reg.exe export "$rawRegPath" "$part" /y /reg:64 2>&1
-                if ($LASTEXITCODE -eq 0 -and (Test-Path $part)) {
+                $null = & "$Sys32\reg.exe" export "$rawRegPath" "$part" /y /reg:64 2>&1
+                if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $part)) {
                     $merged.Add("")
-                    $merged.AddRange([string[]](Get-Content -Path $part -Encoding Unicode | Where-Object { $_ -ne $header }))
+                    $merged.AddRange([string[]](Get-Content -LiteralPath $part -Encoding Unicode | Where-Object { $_ -ne $header }))
                 } else {
                     $backupFailed += $reg
                     Write-Warn "注册表项备份失败，为安全起见本次不删除它: $reg"
                 }
                 $i++
             }
-            Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
             if ($merged.Count -gt 1) {
                 try {
+                    # 备份文件夹是联接/符号链接时拒绝写入，宁可这次不清注册表
+                    if (Test-ReparsePoint $backupDir) { throw "备份文件夹是联接或符号链接，拒绝写入: $backupDir" }
                     New-Item -ItemType Directory -Path $backupDir -Force -ErrorAction Stop | Out-Null
                     # 同一秒内多次备份时加 _2、_3 后缀，绝不覆盖以前的备份
                     $stem = "OfficePLUS_注册表备份_" + (Get-Date).ToString("yyyyMMdd_HHmmss")
@@ -514,11 +542,22 @@ function Invoke-OfficePlusNuke {
     }
 
     # 1. 终止所有占用进程
+    # Office 程序只关当前会话（当前用户）的；OfficePLUS 自己的进程（服务进程在会话 0）不分会话，
+    # 但程序路径必须在 OfficePLUS 的文件夹里，读不到路径也不结束，避免误杀其他软件的同名进程
     Write-Step "第 1/5 步: 终止占用进程与 Office 软件..."
     foreach ($pName in $TargetProcesses) {
         $procs = Get-Process -Name $pName -ErrorAction SilentlyContinue
         if ($procs) {
             foreach ($p in $procs) {
+                if ($OfficePlusProcesses -contains $pName) {
+                    if (-not (Test-OfficePlusProcess $p)) {
+                        Write-Info "跳过进程 $pName (PID: $($p.Id))：程序路径不属于 OfficePLUS 或无法读取"
+                        continue
+                    }
+                } elseif ($p.SessionId -ne $MySessionId) {
+                    Write-Info "跳过进程 $pName (PID: $($p.Id))：不在当前会话（其他用户的 Office）"
+                    continue
+                }
                 Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
                 if (Get-Process -Id $p.Id -ErrorAction SilentlyContinue) {
                     Write-Danger "无法结束进程: $pName (PID: $($p.Id))"
@@ -536,7 +575,7 @@ function Invoke-OfficePlusNuke {
         $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
         if ($svc) {
             Stop-Service -Name $svcName -Force -ErrorAction SilentlyContinue
-            & sc.exe delete "$svcName" | Out-Null
+            & "$Sys32\sc.exe" delete "$svcName" | Out-Null
             if ($LASTEXITCODE -eq 0) {
                 Write-Success "已彻底注销系统服务: $svcName"
             } else {
@@ -549,9 +588,9 @@ function Invoke-OfficePlusNuke {
     Write-Step "第 3/5 步: 移除全局与用户级注册表加载项..."
     foreach ($reg in $TargetRegistryKeys) {
         if ($backupFailed -contains $reg) { continue }
-        if (Test-Path $reg) {
-            Remove-Item -Path $reg -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable regErr
-            if (Test-Path $reg) {
+        if (Test-Path -LiteralPath $reg) {
+            Remove-Item -LiteralPath $reg -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable regErr
+            if (Test-Path -LiteralPath $reg) {
                 Write-Danger "删除注册表项失败: $reg"
                 if ($regErr) { Write-Info "原因: $($regErr[0].Exception.Message)" }
             } else {
@@ -580,11 +619,17 @@ function Invoke-OfficePlusNuke {
     # 5. 彻底删除程序与缓存文件
     Write-Step "第 5/5 步: 彻底删除安装目录与所有缓存..."
     foreach ($dir in $TargetDirectories) {
-        if (Test-Path $dir) {
-            # 解除只读/隐藏/系统文件属性锁定
-            $null = & cmd.exe /c "attrib -r -s -h `"$dir\*`" /s /d" 2>$null
-            Remove-Item -Path $dir -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable dirErr
-            if (Test-Path $dir) {
+        if (Test-Path -LiteralPath $dir) {
+            if (Test-ReparsePoint $dir) {
+                # 目录本身是联接/符号链接：只删链接，不进入、不改它指向的目录
+                $dirErr = $null
+                try { [IO.Directory]::Delete($dir, $false) } catch { $dirErr = @($_) }
+            } else {
+                # 解除只读/隐藏/系统文件属性锁定
+                $null = & "$Sys32\attrib.exe" -r -s -h "$dir\*" /s /d 2>$null
+                Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable dirErr
+            }
+            if (Test-Path -LiteralPath $dir) {
                 Write-Danger "目录未能完全删除（可能有文件正被占用）: $dir"
                 foreach ($e in @($dirErr | Select-Object -First 3)) { Write-Info "原因: $($e.Exception.Message)" }
             } else {

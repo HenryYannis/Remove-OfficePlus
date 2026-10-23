@@ -8,7 +8,9 @@ from dataclasses import dataclass, field
 from typing import List
 from .user_context import resolve_key
 from .discovery import get_registry_keys, get_services
-from .constants import OFFICEPLUS_PROCESSES, OFFICE_APP_PROCESSES, TASK_KEYWORD, get_target_directories
+from .constants import OFFICEPLUS_PROCESSES, OFFICE_APP_PROCESSES, TASK_KEYWORD, OFFICEPLUS_KEYWORD, get_target_directories
+from .winutil import (COMMAND_TIMEOUT, current_session_id, is_officeplus_image, list_processes,
+                      process_path, system_exe)
 
 @dataclass
 class ScanReport:
@@ -35,37 +37,44 @@ def is_admin() -> bool:
     except Exception:
         return False
 
-def scan_processes(targets=OFFICEPLUS_PROCESSES) -> List[str]:
+def scan_processes(targets=OFFICEPLUS_PROCESSES, session_only=False) -> List[str]:
+    """列出正在运行的目标进程。
+
+    OfficePLUS 自己的进程还要核对程序路径：DeepLink.exe 这类名字很常见，路径不在 OfficePLUS
+    的文件夹里就不算；没权限读路径时（例如未提权扫描系统服务进程）照样报告，宁可多报。
+    session_only=True 时只看当前会话（清理时只关当前用户的 Office，提醒保存也只针对他）。
+    """
     found = []
-    try:
-        output = subprocess.check_output(
-            ["tasklist", "/FO", "CSV", "/NH"],
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            encoding="utf-8",
-            errors="ignore"
-        )
-        for line in output.strip().splitlines():
-            parts = [p.strip(' "') for p in line.split('","')]
-            if parts:
-                proc_name = parts[0]
-                for target in targets:
-                    if proc_name.lower() == target.lower():
-                        found.append(f"{proc_name} (PID: {parts[1]})")
-    except Exception:
-        pass
+    wanted = {t.lower() for t in targets}
+    check_path = wanted & {p.lower() for p in OFFICEPLUS_PROCESSES}
+    my_session = current_session_id() if session_only else None
+    for proc in list_processes():
+        if proc.name.lower() not in wanted:
+            continue
+        if my_session is not None and proc.session != my_session:
+            continue
+        if proc.name.lower() in check_path:
+            path = process_path(proc.pid)
+            if path and not is_officeplus_image(path, OFFICEPLUS_KEYWORD):
+                continue
+        found.append(f"{proc.name} (PID: {proc.pid})")
     return found
 
 def scan_services() -> List[str]:
     found = []
     for svc in get_services():
         try:
-            output = subprocess.check_output(
-                ["sc.exe", "query", svc],
+            res = subprocess.run(
+                [system_exe("sc.exe"), "query", svc],
                 creationflags=subprocess.CREATE_NO_WINDOW,
-                encoding="utf-8",
-                errors="ignore"
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=COMMAND_TIMEOUT,
             )
-            if "RUNNING" in output or "STOPPED" in output or "PAUSED" in output:
+            # 看退出码而不是状态文字：0 = 服务存在（含 START_PENDING、STOP_PENDING 等中间状态），
+            # 1060 = 服务不存在
+            if res.returncode == 0:
                 found.append(svc)
         except Exception:
             pass
@@ -111,8 +120,10 @@ def list_scheduled_tasks() -> List[str]:
 
     # 读不到文件夹时退回 schtasks，按控制台实际使用的代码页解码（中文系统是 GBK）
     output = subprocess.check_output(
-        ["schtasks", "/Query", "/FO", "CSV", "/NH"],
+        [system_exe("schtasks.exe"), "/Query", "/FO", "CSV", "/NH"],
         creationflags=subprocess.CREATE_NO_WINDOW,
+        stdin=subprocess.DEVNULL,
+        timeout=COMMAND_TIMEOUT,
         encoding=f"cp{ctypes.windll.kernel32.GetOEMCP()}",
         errors="replace",
     )
@@ -153,5 +164,5 @@ def run_scan() -> ScanReport:
         registry_keys=_safe(scan_registry),
         directories=_safe(scan_directories),
         scheduled_tasks=_safe(scan_scheduled_tasks),
-        office_apps=_safe(scan_processes, OFFICE_APP_PROCESSES),
+        office_apps=_safe(scan_processes, OFFICE_APP_PROCESSES, True),
     )

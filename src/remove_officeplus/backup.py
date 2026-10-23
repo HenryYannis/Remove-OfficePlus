@@ -7,6 +7,7 @@ from typing import Iterable, Optional, Set, Tuple
 
 from .user_context import get_target_user, resolve_key
 from . import runlog
+from .winutil import COMMAND_TIMEOUT, is_reparse_point, system_exe
 
 BACKUP_FOLDER_NAME = "Remove-OfficePlus 备份"
 REG_HEADER = "Windows Registry Editor Version 5.00"
@@ -80,26 +81,36 @@ def backup_registry(keys: Iterable[Tuple[str, str]]) -> Tuple[Optional[str], Set
     with tempfile.TemporaryDirectory() as tmp:
         for i, (subkey, root_name) in enumerate(keys):
             part = os.path.join(tmp, f"{i}.reg")
-            res = subprocess.run(
-                ["reg.exe", "export", resolve_key(subkey, root_name)[2], part, "/y", "/reg:64"],
-                creationflags=subprocess.CREATE_NO_WINDOW,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            if res.returncode == 0 and os.path.exists(part):
+            try:
+                res = subprocess.run(
+                    [system_exe("reg.exe"), "export", resolve_key(subkey, root_name)[2], part, "/y", "/reg:64"],
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=COMMAND_TIMEOUT,
+                )
+                code = res.returncode
+            except Exception as e:  # 超时等：按备份失败处理，这一项不删
+                code = repr(e)
+            if code == 0 and os.path.exists(part):
                 with open(part, encoding="utf-16") as fh:
                     text = fh.read()
                 # 去掉每个分段自带的文件头，合并后只保留一个
                 parts.append(text.replace(REG_HEADER, "", 1).strip("\r\n"))
             else:
                 failed.add((subkey, root_name))
-                runlog.add(f"[失败] 导出注册表项 {resolve_key(subkey, root_name)[2]}，退出码 {res.returncode}")
+                runlog.add(f"[失败] 导出注册表项 {resolve_key(subkey, root_name)[2]}，退出码 {code}")
 
     if not parts:
         return None, failed
 
     backup_dir = get_backup_dir()
     try:
+        # 管理员身份往用户可控的「文档」里写：备份文件夹是联接/符号链接时拒绝写入，
+        # 免得被引到系统目录里。宁可这次不清注册表。
+        if is_reparse_point(backup_dir):
+            raise OSError(f"备份文件夹是联接或符号链接，拒绝写入: {backup_dir}")
         os.makedirs(backup_dir, exist_ok=True)
         path = _write_backup_file(backup_dir, REG_HEADER + "\n\n" + "\n\n".join(parts) + "\n")
     except Exception as e:

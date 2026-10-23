@@ -17,7 +17,7 @@ END = "# ---- END RULES ----"
 
 # 目录规则里的位置 → PowerShell 里的变量（用户目录指实际要清理的那个用户）
 BASES = {
-    "ProgramFiles": "$env:ProgramFiles",
+    "ProgramFiles": "$ProgramFiles64",  # 脚本里优先取 ProgramW6432，32 位 PowerShell 也能找到 64 位目录
     "ProgramFiles(x86)": "${env:ProgramFiles(x86)}",
     "ProgramData": "$env:ProgramData",
     "LocalAppData": "$UserLocalAppData",
