@@ -1,36 +1,154 @@
 {
   "_说明": "OfficePLUS 识别规则，Python 版和 PowerShell 版共用这一份。改完运行 python scripts/sync_rules.py 同步到 PowerShell 脚本，CI 会检查两边是否一致。",
-  "officeplus_processes": ["MSOfficePLUSService", "OfficePLUS.AgentLauncher", "DeepLink", "OfficePLUS"],
-  "office_app_processes": ["WINWORD", "EXCEL", "POWERPNT", "OUTLOOK"],
-  "services": ["OfficePLUS Service"],
+  "officeplus_processes": [
+    "MSOfficePLUSService",
+    "OfficePLUS.AgentLauncher",
+    "DeepLink",
+    "OfficePLUS"
+  ],
+  "office_app_processes": [
+    "WINWORD",
+    "EXCEL",
+    "POWERPNT",
+    "OUTLOOK"
+  ],
+  "services": [
+    "OfficePLUS Service"
+  ],
   "task_keyword": "OfficePLUS",
   "registry_keys": [
-    ["HKLM", "Software\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"],
-    ["HKLM", "Software\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"],
-    ["HKLM", "Software\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"],
-    ["HKLM", "Software\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"],
-    ["HKLM", "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"],
-    ["HKLM", "Software\\Microsoft\\OfficePLUS"],
-    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"],
-    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"],
-    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"],
-    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"],
-    ["HKLM", "Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"],
-    ["HKLM", "Software\\Wow6432Node\\Microsoft\\OfficePLUS"],
-    ["HKCU", "Software\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"],
-    ["HKCU", "Software\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"],
-    ["HKCU", "Software\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"],
-    ["HKCU", "Software\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"],
-    ["HKCU", "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"],
-    ["HKCU", "Software\\Microsoft\\OfficePLUS"]
+    [
+      "HKLM",
+      "Software\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Microsoft\\OfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Wow6432Node\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Wow6432Node\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Wow6432Node\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Wow6432Node\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"
+    ],
+    [
+      "HKLM",
+      "Software\\Wow6432Node\\Microsoft\\OfficePLUS"
+    ],
+    [
+      "HKCU",
+      "Software\\Microsoft\\Office\\Word\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKCU",
+      "Software\\Microsoft\\Office\\Excel\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKCU",
+      "Software\\Microsoft\\Office\\PowerPoint\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKCU",
+      "Software\\Microsoft\\Office\\Outlook\\Addins\\MSOfficePLUS"
+    ],
+    [
+      "HKCU",
+      "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSOfficePLUS"
+    ],
+    [
+      "HKCU",
+      "Software\\Microsoft\\OfficePLUS"
+    ]
   ],
   "directories": [
-    ["ProgramFiles", "Microsoft OfficePLUS"],
-    ["ProgramFiles(x86)", "Microsoft OfficePLUS"],
-    ["ProgramData", "Microsoft OfficePLUS"],
-    ["LocalAppData", "OfficePLUS"],
-    ["LocalAppData", "Microsoft OfficePLUS"],
-    ["AppData", "OfficePLUS"],
-    ["AppData", "Microsoft OfficePLUS"]
-  ]
+    [
+      "ProgramFiles",
+      "Microsoft OfficePLUS"
+    ],
+    [
+      "ProgramFiles(x86)",
+      "Microsoft OfficePLUS"
+    ],
+    [
+      "ProgramData",
+      "Microsoft OfficePLUS"
+    ],
+    [
+      "LocalAppData",
+      "OfficePLUS"
+    ],
+    [
+      "LocalAppData",
+      "Microsoft OfficePLUS"
+    ],
+    [
+      "AppData",
+      "OfficePLUS"
+    ],
+    [
+      "AppData",
+      "Microsoft OfficePLUS"
+    ]
+  ],
+  "addin_keyword": "OfficePLUS",
+  "addin_apps": [
+    "Word",
+    "Excel",
+    "PowerPoint",
+    "Outlook"
+  ],
+  "addin_parents": [
+    [
+      "HKLM",
+      "Software\\Microsoft\\Office\\{app}\\Addins"
+    ],
+    [
+      "HKLM",
+      "Software\\Wow6432Node\\Microsoft\\Office\\{app}\\Addins"
+    ],
+    [
+      "HKCU",
+      "Software\\Microsoft\\Office\\{app}\\Addins"
+    ],
+    [
+      "HKLM",
+      "Software\\Microsoft\\Office\\ClickToRun\\REGISTRY\\MACHINE\\Software\\Microsoft\\Office\\{app}\\Addins"
+    ],
+    [
+      "HKLM",
+      "Software\\Microsoft\\Office\\ClickToRun\\REGISTRY\\MACHINE\\Software\\Wow6432Node\\Microsoft\\Office\\{app}\\Addins"
+    ]
+  ],
+  "service_image": "MSOfficePLUSService.exe",
+  "_说明_特征识别": "除了上面写死的注册表项和服务名，还会在 addin_parents 下的各个加载项里找名字、FriendlyName、Description 或 Manifest 含 addin_keyword 的；在系统服务里找程序路径（ImagePath）含 service_image 的。只认这两个特征，避免误删其他加载项和服务。"
 }
