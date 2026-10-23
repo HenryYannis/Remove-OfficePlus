@@ -60,6 +60,12 @@ def render(rules: dict) -> str:
         var = BASES[base]
         lines.append(f"    if ({var}) {{ Join-Path {var} {q(name)} }}")
     lines.append(")")
+    lines.append("")
+    lines.append("# 按特征识别（见 Find-OfficePlusAddins / Find-OfficePlusServices）")
+    lines.append(f"$AddinKeyword = {q(rules['addin_keyword'])}")
+    lines += ps_array("AddinApps", [q(a) for a in rules["addin_apps"]])
+    lines += ps_array("AddinParents", [q(f"{ROOTS[r]}\\{p}") for r, p in rules["addin_parents"]])
+    lines.append(f"$ServiceImage = {q(rules['service_image'])}")
     lines.append(END)
     return "\n".join(lines)
 
