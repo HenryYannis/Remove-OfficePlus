@@ -63,6 +63,13 @@ def display_scan(report):
     else:
         print("  [+] 未发现任何 OfficePLUS 文件或缓存残留。")
 
+    print("\n[5] 计划任务检测：")
+    if report.scheduled_tasks:
+        for t in report.scheduled_tasks:
+            print(f"  [-] 发现计划任务: {t}")
+    else:
+        print("  [+] 未发现 OfficePLUS 相关计划任务。")
+
     print("\n" + "-" * 60)
     if not report.is_clean:
         print(f"[!] 排查完成：共检测到 {report.total_threats} 处 OfficePLUS 关联项目/残留！")
