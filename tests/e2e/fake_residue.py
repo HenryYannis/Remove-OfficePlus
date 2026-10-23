@@ -9,6 +9,8 @@
     python tests/e2e/fake_residue.py office-scan   # 正常运行的 Word 不应被扫描当成威胁（Python 版）
     python tests/e2e/fake_residue.py office-start  # 启动一个假的 WINWORD.EXE（给 PowerShell 版测试用）
     python tests/e2e/fake_residue.py office-stop
+    python tests/e2e/fake_residue.py lock-start    # 占住残留目录里的一个文件，让清理必然失败
+    python tests/e2e/fake_residue.py lock-stop
 
 注意：假残留的位置取自 constants.py，只能验证“删除逻辑是否可靠”，
 不能证明这些路径就是真实 OfficePLUS 的安装位置。
@@ -118,6 +120,32 @@ def office_scan():
     print("✅ 正常运行的 Word 没被当成威胁，且能被识别出来用于保存提醒。")
 
 
+LOCK_PID_FILE = os.path.join(tempfile.gettempdir(), "officeplus_e2e_lock.pid")
+
+
+def lock_start():
+    """另起一个进程打开残留目录里的文件不放（不允许删除），模拟“文件被占用删不掉”。"""
+    target = os.path.join(get_target_directories()[-1], "locked.dat")
+    code = f"import time; f = open(r'{target}', 'w'); time.sleep(900)"
+    proc = subprocess.Popen([sys.executable, "-c", code], creationflags=0x08000000 | 0x00000008)
+    with open(LOCK_PID_FILE, "w") as fh:
+        fh.write(str(proc.pid))
+    time.sleep(2)
+    try:
+        os.remove(target)
+        sys.exit("文件没有被占住，测试无效")
+    except PermissionError:
+        print(f"已占住 {target}")
+
+
+def lock_stop():
+    if os.path.exists(LOCK_PID_FILE):
+        with open(LOCK_PID_FILE) as fh:
+            run(["taskkill", "/F", "/PID", fh.read().strip()])
+        os.remove(LOCK_PID_FILE)
+        time.sleep(1)
+
+
 def plant():
     for path, hive in TARGET_REGISTRY_KEYS:
         create_key(hive, path)
@@ -193,4 +221,5 @@ if __name__ == "__main__":
     {
         "plant": plant, "verify": verify, "cleanup": cleanup,
         "office-scan": office_scan, "office-start": office_start, "office-stop": office_stop,
+        "lock-start": lock_start, "lock-stop": lock_stop,
     }.get(action, lambda: sys.exit(__doc__))()
