@@ -20,13 +20,14 @@ def kill_processes() -> List[str]:
     killed = []
     for proc in TARGET_PROCESSES:
         try:
-            subprocess.run(
+            res = subprocess.run(
                 ["taskkill", "/F", "/IM", proc],
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-            killed.append(proc)
+            if res.returncode == 0:  # 没在运行或结束失败都不算
+                killed.append(proc)
         except Exception:
             pass
     return killed
@@ -54,24 +55,35 @@ def delete_services() -> List[str]:
     return removed
 
 def _delete_reg_key_tree(root, subkey):
+    """递归删除注册表键。先把子键名字全部读出来再逐个删除，
+    这样某个子键删不掉时也不会反复重试、卡死。"""
     try:
-        key = winreg.OpenKey(root, subkey, 0, winreg.KEY_ALL_ACCESS)
-    except FileNotFoundError:
-        return
-    except Exception:
-        return
-
-    while True:
-        try:
-            child_name = winreg.EnumKey(key, 0)
-            _delete_reg_key_tree(root, f"{subkey}\\{child_name}")
-        except OSError:
-            break
-    winreg.CloseKey(key)
+        with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ) as key:
+            children = []
+            i = 0
+            while True:
+                try:
+                    children.append(winreg.EnumKey(key, i))
+                    i += 1
+                except OSError:
+                    break
+    except OSError:
+        return  # 不存在或打不开，交给调用方复查
+    for child in children:
+        _delete_reg_key_tree(root, f"{subkey}\\{child}")
     try:
         winreg.DeleteKey(root, subkey)
-    except Exception:
+    except OSError:
         pass
+
+def _reg_key_exists(root, subkey) -> bool:
+    try:
+        with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ):
+            return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True  # 没权限读也当作还在
 
 def clean_registry() -> List[str]:
     cleaned = []
@@ -83,18 +95,10 @@ def clean_registry() -> List[str]:
         root = root_map.get(root_name)
         if not root:
             continue
-        try:
-            # Check existence first
-            with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ):
-                exists = True
-        except FileNotFoundError:
-            exists = False
-        except Exception:
-            exists = True
-
-        if exists:
+        if _reg_key_exists(root, subkey):
             _delete_reg_key_tree(root, subkey)
-            cleaned.append(f"{root_name}\\{subkey}")
+            if not _reg_key_exists(root, subkey):  # 删完复查，真的没了才算成功
+                cleaned.append(f"{root_name}\\{subkey}")
     return cleaned
 
 def clean_scheduled_tasks() -> List[str]:
@@ -111,13 +115,14 @@ def clean_scheduled_tasks() -> List[str]:
             if parts:
                 task_name = parts[0]
                 if "officeplus" in task_name.lower():
-                    subprocess.run(
+                    res = subprocess.run(
                         ["schtasks", "/Delete", "/TN", task_name, "/F"],
                         creationflags=subprocess.CREATE_NO_WINDOW,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL
                     )
-                    cleaned.append(task_name)
+                    if res.returncode == 0:
+                        cleaned.append(task_name)
     except Exception:
         pass
     return cleaned

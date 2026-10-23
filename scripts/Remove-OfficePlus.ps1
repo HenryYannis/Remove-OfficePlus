@@ -312,7 +312,11 @@ function Invoke-OfficePlusNuke {
         if ($procs) {
             foreach ($p in $procs) {
                 Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-                Write-Danger "已强制终止进程: $pName (PID: $($p.Id))"
+                if (Get-Process -Id $p.Id -ErrorAction SilentlyContinue) {
+                    Write-Danger "无法结束进程: $pName (PID: $($p.Id))"
+                } else {
+                    Write-Danger "已强制终止进程: $pName (PID: $($p.Id))"
+                }
             }
         }
     }
@@ -325,7 +329,11 @@ function Invoke-OfficePlusNuke {
         if ($svc) {
             Stop-Service -Name $svcName -Force -ErrorAction SilentlyContinue
             & sc.exe delete "$svcName" | Out-Null
-            Write-Success "已彻底注销系统服务: $svcName"
+            if ($LASTEXITCODE -eq 0) {
+                Write-Success "已彻底注销系统服务: $svcName"
+            } else {
+                Write-Danger "注销系统服务失败: $svcName"
+            }
         }
     }
 
@@ -334,7 +342,11 @@ function Invoke-OfficePlusNuke {
     foreach ($reg in $TargetRegistryKeys) {
         if (Test-Path $reg) {
             Remove-Item -Path $reg -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Success "已删除注册表项: $reg"
+            if (Test-Path $reg) {
+                Write-Danger "删除注册表项失败: $reg"
+            } else {
+                Write-Success "已删除注册表项: $reg"
+            }
         }
     }
 
@@ -344,7 +356,11 @@ function Invoke-OfficePlusNuke {
     if ($tasks) {
         foreach ($t in $tasks) {
             $t | Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue
-            Write-Success "已注销计划任务: $($t.TaskName)"
+            if (Get-ScheduledTask -TaskName $t.TaskName -TaskPath $t.TaskPath -ErrorAction SilentlyContinue) {
+                Write-Danger "注销计划任务失败: $($t.TaskName)"
+            } else {
+                Write-Success "已注销计划任务: $($t.TaskName)"
+            }
         }
     } else {
         Write-Info "无计划任务需要清理。"
@@ -355,19 +371,30 @@ function Invoke-OfficePlusNuke {
     foreach ($dir in $TargetDirectories) {
         if (Test-Path $dir) {
             # 解除只读/隐藏/系统文件属性锁定
-            & cmd.exe /c "attrib -r -s -h `"$dir\*`" /s /d" 2>$null
+            $null = & cmd.exe /c "attrib -r -s -h `"$dir\*`" /s /d" 2>$null
             Remove-Item -Path $dir -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Success "已删除目录: $dir"
+            if (Test-Path $dir) {
+                Write-Danger "目录未能完全删除（可能有文件正被占用）: $dir"
+            } else {
+                Write-Success "已删除目录: $dir"
+            }
         }
     }
 
-    Write-Host "`n============================================================" -ForegroundColor Green
-    Write-Host "  [+] 微软 OfficePLUS 及关联组件已全部彻底根除。" -ForegroundColor Green
-    Write-Host "============================================================" -ForegroundColor Green
-
-    # 执行清理后复检
+    # 执行清理后复检，按实际结果汇报
     Write-Host "`n正在进行清理后状态复检..." -ForegroundColor Cyan
-    $null = Invoke-OfficePlusScan
+    $script:NukeRemaining = [int](Invoke-OfficePlusScan | Select-Object -Last 1)
+
+    if ($script:NukeRemaining -eq 0) {
+        Write-Host "============================================================" -ForegroundColor Green
+        Write-Host "  [+] 微软 OfficePLUS 及关联组件已全部清除。" -ForegroundColor Green
+        Write-Host "============================================================" -ForegroundColor Green
+    } else {
+        Write-Host "============================================================" -ForegroundColor Red
+        Write-Host "  [!] 还有 $($script:NukeRemaining) 处残留没能删除，见上方列表。" -ForegroundColor Red
+        Write-Host "  建议重启电脑后再运行一次；仍然删不掉的话，欢迎到 GitHub 提交 Issue。" -ForegroundColor Red
+        Write-Host "============================================================" -ForegroundColor Red
+    }
 }
 
 # ==========================================
@@ -382,6 +409,7 @@ if ($Scan) {
 
 if ($Nuke) {
     Invoke-OfficePlusNuke
+    if ($script:NukeRemaining -gt 0) { exit 1 }
     exit
 }
 
