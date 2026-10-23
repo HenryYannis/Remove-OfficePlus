@@ -22,6 +22,7 @@ def fake_shell_execute(hwnd, verb, program, params, directory, show):
     if mode == "cancel":
         return 5  # 用户在 UAC 里点了「否」时 ShellExecute 返回 5（拒绝访问）
     cmdline = subprocess.list2cmdline([program]) + " " + params
+    assert "--pause-on-exit" in params, f"提权重启时没有加 --pause-on-exit，新窗口会一闪而过: {params}"
     print(f"[test] 以管理员身份重新启动: {cmdline}")
     proc = subprocess.run(cmdline, cwd=directory)
     launched.append(proc.returncode)

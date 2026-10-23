@@ -1,5 +1,6 @@
 import argparse
 import sys
+from . import __version__
 from .scanner import run_scan
 from . import cleaner, runlog
 from .cleaner import run_nuke
@@ -109,41 +110,122 @@ def _safe_console_output():
             except Exception:
                 pass
 
+def _has_console() -> bool:
+    """打包成 exe 时用的是无控制台的 --windowed 模式，此时 sys.stdout/stdin 是 None，
+    print 没有任何输出、input 会直接崩溃。"""
+    return sys.stdout is not None and sys.stdin is not None
+
+def _no_console_exit(detail: str = ""):
+    """没有控制台却要走命令行模式时，弹窗说明原因后退出，而不是悄无声息地崩溃。"""
+    msg = ("这个 exe 是图形界面版，不支持命令行参数。\n"
+           "命令行请使用 PowerShell 脚本或 Python 版（见 GitHub 项目说明）。")
+    if detail:
+        msg = f"{detail}\n\n{msg}"
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, msg, "Remove-OfficePlus", 0x30)
+    except Exception:
+        pass
+    sys.exit(2)
+
+def _pause_on_exit(enabled: bool):
+    """提权后会在新的控制台窗口里运行，结束后窗口立即关闭，看不到结果。
+    这种情况下停一下；输入被重定向（脚本、测试）时不停。"""
+    if enabled and sys.stdin is not None and sys.stdin.isatty():
+        try:
+            input("\n按回车键退出...")
+        except (EOFError, KeyboardInterrupt):
+            pass
+
+def display_plan(report):
+    """预演：列出清理时会执行的操作，不做任何修改。"""
+    from .backup import get_backup_dir
+    print(">>> 预演模式：以下是执行清理时会做的操作，本次不做任何修改。\n")
+    if report.is_clean:
+        print("[+] 没有需要清理的项目。")
+        return
+    steps = [
+        ("结束进程", report.processes),
+        ("停止并删除服务", report.services),
+        ("删除注册表项（删除前先备份）", report.registry_keys),
+        ("删除计划任务", report.scheduled_tasks),
+        ("删除目录", report.directories),
+    ]
+    for title, items in steps:
+        for item in items:
+            print(f"  [{title}] {item}")
+    office = sorted({p.split(" (PID")[0] for p in report.office_apps})
+    if office:
+        print(f"\n[!] 清理时会强制关闭正在运行的 Office：{'、'.join(office)}，请先保存文件。")
+    print(f"\n[*] 注册表备份和清理日志会保存到：{get_backup_dir()}")
+    print("[*] 确认无误后，用 --nuke 执行清理。")
+
 def main():
     _safe_console_output()
     parser = argparse.ArgumentParser(description="Remove-OfficePlus: 一键彻底根除微软OfficePLUS及同类流氓加载项")
+    parser.add_argument("--version", action="version", version=f"Remove-OfficePlus {__version__}")
     parser.add_argument("--gui", action="store_true", help="启动图形界面桌面窗口 (默认)")
     parser.add_argument("--cli", action="store_true", help="使用命令行交互模式")
     parser.add_argument("--scan", action="store_true", help="仅扫描诊断系统残留，不进行任何修改")
-    parser.add_argument("--nuke", action="store_true", help="执行彻底根除清理")
-    parser.add_argument("-f", "--force", action="store_true", help="跳过交互确认直接执行清理")
+    parser.add_argument("--dry-run", action="store_true", help="预演：列出清理时会删除的项目，不进行任何修改")
+    parser.add_argument("--nuke", action="store_true", help="执行彻底根除清理（会先询问确认，加 -f 跳过）")
+    parser.add_argument("-f", "--force", "--yes", action="store_true", help="跳过交互确认直接执行清理")
+    parser.add_argument("--pause-on-exit", action="store_true", help=argparse.SUPPRESS)  # 提权重启时自动加上
 
+    cli_args = [a for a in sys.argv[1:] if a not in ("--gui", "--pause-on-exit")]
+    if not _has_console() and cli_args:
+        _no_console_exit()
     args = parser.parse_args()
 
     # 如果指定了 --gui 或者没有指定任何命令行操作参数，默认启动 GUI 窗口
-    if args.gui or (not args.cli and not args.scan and not args.nuke and not args.force):
+    if args.gui or (not args.cli and not args.scan and not args.dry_run and not args.nuke and not args.force):
         try:
             from .gui import launch_gui
             launch_gui()
             return
         except Exception as e:
+            if not _has_console():
+                _no_console_exit(f"启动图形界面失败：{e}")
             print(f"启动图形界面失败 ({e})，将回退至命令行模式。\n")
 
+    try:
+        code = _run_cli(args)
+    finally:
+        _pause_on_exit(args.pause_on_exit)
+    if code:
+        sys.exit(code)
+
+def _run_cli(args) -> int:
     print_banner()
 
     if args.scan:
         report = run_scan()
         display_scan(report)
-        return
+        return 0
+
+    if args.dry_run:
+        report = run_scan()
+        display_scan(report)
+        display_plan(report)
+        return 0
 
     if args.nuke:
-        if not args.force and not confirm_office_saved(run_scan()):
-            return
+        report = run_scan()
+        if not args.force:
+            if report.is_clean:
+                display_scan(report)
+                print("系统目前处于干净状态，无需清理。")
+                return 0
+            display_plan(report)
+            choice = input("\n确认执行以上清理？(y/N): ").strip()
+            if choice.lower() != "y":
+                print("操作已取消。")
+                return 0
+            if not confirm_office_saved(report):
+                return 0
         print(">>> 正在执行彻底根除清理...")
         run_nuke()
-        if not report_nuke_result():
-            sys.exit(1)
-        return
+        return 0 if report_nuke_result() else 1
 
     # Interactive mode
     report = run_scan()
@@ -152,20 +234,21 @@ def main():
     if report.is_clean:
         print("系统目前处于干净状态，无需进一步清理。")
         input("\n按回车键退出...")
-        return
+        return 0
 
     if not args.force:
         choice = input("是否立即执行彻底清理根除？(y/N): ").strip()
         if choice.lower() != 'y':
             print("操作已取消。")
-            return
+            return 0
         if not confirm_office_saved(report):
-            return
+            return 0
 
     print("\n>>> 正在执行彻底根除清理...")
     run_nuke()
-    report_nuke_result()
+    clean = report_nuke_result()
     input("\n按回车键退出...")
+    return 0 if clean else 1
 
 if __name__ == "__main__":
     main()

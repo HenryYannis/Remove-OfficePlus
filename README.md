@@ -79,8 +79,14 @@ python main.py
 # 仅命令行扫描诊断
 python main.py --scan
 
-# 命令行执行彻底根除
+# 预演：列出清理时会删除的项目，不做任何修改
+python main.py --dry-run
+
+# 命令行执行彻底根除（会先列出要删的项目并询问确认，加 -f 跳过确认）
 python main.py --nuke
+
+# 查看版本号
+python main.py --version
 ```
 
 ---
