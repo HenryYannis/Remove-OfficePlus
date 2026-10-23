@@ -6,7 +6,8 @@ import ctypes
 from dataclasses import dataclass, field
 from typing import List
 from .user_context import resolve_key
-from .constants import OFFICEPLUS_PROCESSES, OFFICE_APP_PROCESSES, TARGET_SERVICES, TARGET_REGISTRY_KEYS, TASK_KEYWORD, get_target_directories
+from .discovery import get_registry_keys, get_services
+from .constants import OFFICEPLUS_PROCESSES, OFFICE_APP_PROCESSES, TASK_KEYWORD, get_target_directories
 
 @dataclass
 class ScanReport:
@@ -55,7 +56,7 @@ def scan_processes(targets=OFFICEPLUS_PROCESSES) -> List[str]:
 
 def scan_services() -> List[str]:
     found = []
-    for svc in TARGET_SERVICES:
+    for svc in get_services():
         try:
             output = subprocess.check_output(
                 ["sc.exe", "query", svc],
@@ -71,10 +72,10 @@ def scan_services() -> List[str]:
 
 def scan_registry() -> List[str]:
     found = []
-    for key, root_name in TARGET_REGISTRY_KEYS:
+    for key, root_name in get_registry_keys():
         root, subkey, reg_path = resolve_key(key, root_name)
         try:
-            with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ):
+            with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY):
                 found.append(reg_path)
         except FileNotFoundError:
             pass
