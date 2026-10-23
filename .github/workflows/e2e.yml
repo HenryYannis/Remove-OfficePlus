@@ -31,6 +31,15 @@ jobs:
         run: |
           python -m remove_officeplus --scan
           python tests/e2e/fake_residue.py scan-check
+      - name: --version、预演、不确认时都不能改动任何东西
+        run: |
+          python -m remove_officeplus --version
+          if ($LASTEXITCODE) { exit 1 }
+          python -m remove_officeplus --dry-run
+          if ($LASTEXITCODE) { exit 1 }
+          "n" | python -m remove_officeplus --nuke
+          python tests/e2e/fake_residue.py registry-kept
+          python tests/e2e/fake_residue.py scan-check
       - name: 执行清理
         run: python -m remove_officeplus --nuke -f
       - name: 检查结果
