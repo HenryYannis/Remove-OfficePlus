@@ -127,6 +127,22 @@ Python 版不带参数时启动图形界面。
 
 ---
 
+## 实测效果
+
+2026-10-23 我在一台 Windows 10 电脑上实测了 v1.1.0：无论是 Office 自动装上的 OfficePLUS，还是从官网下载安装包装的，都能扫描出来并清理干净，复扫为 0。
+
+| 清理前扫描 | 清理后复扫 |
+| :---: | :---: |
+| ![清理前扫描到 14 处残留](docs/images/scan-before.png) | ![清理后复扫为 0](docs/images/scan-after.png) |
+
+清理前会自动备份注册表，和清理日志一起放在「文档\Remove-OfficePlus 备份」：
+
+![备份文件夹](docs/images/backup-folder.png)
+
+原始日志和注册表备份见 [docs/real-test](docs/real-test/)。
+
+---
+
 ## 清理覆盖范围
 
 | 模块类别 | 目标路径 / 标识 | 处理方式 |
@@ -155,9 +171,12 @@ Remove-OfficePlus/
 ├── .github/
 │   ├── ISSUE_TEMPLATE/          # Issue 模板
 │   └── workflows/
-│       ├── ci.yml               # 语法检查、规则一致性检查、打包 exe
+│       ├── ci.yml               # 语法检查、规则一致性和真机样本检查、打包 exe
 │       ├── e2e.yml              # 在 Windows 上种下假残留，真实清理并校验
 │       └── release.yml          # 推送 v* 标签时自动打包 exe 并发布
+├── docs/
+│   ├── images/                  # README 用的实测截图
+│   └── real-test/               # 真机清理日志和注册表备份样本
 ├── scripts/
 │   ├── Remove-OfficePlus.ps1    # PowerShell 版（零依赖）
 │   └── sync_rules.py            # 把 rules.json 同步进 PowerShell 脚本
@@ -173,7 +192,9 @@ Remove-OfficePlus/
 │       ├── user_context.py      # 确定要清理哪个用户
 │       ├── cli.py               # 命令行入口
 │       └── gui.py               # 图形界面
-├── tests/e2e/                   # 端到端测试脚本
+├── tests/
+│   ├── e2e/                     # 端到端测试脚本
+│   └── real_sample_check.py     # 用真机样本核对识别规则
 ├── build_exe.py                 # 打包 exe（含版本信息和 SHA256）
 ├── Quick-Remove.bat             # 双击运行
 ├── main.py                      # Python 启动入口

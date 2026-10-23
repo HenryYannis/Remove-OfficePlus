@@ -1,0 +1,59 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Office\Word\Addins\MSOfficePLUS]
+"Description"="Microsoft OfficePLUS"
+"FriendlyName"="Microsoft OfficePLUS"
+"LoadBehavior"=dword:00000003
+"Manifest"="file:///C:\\Program Files\\Microsoft OfficePLUS\\3.10.0.28331\\wordaddin\\MSOPWordAddin.vsto|vstolocal"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Office\Excel\Addins\MSOfficePLUS]
+"Description"="Microsoft OfficePLUS"
+"FriendlyName"="Microsoft OfficePLUS"
+"LoadBehavior"=dword:00000003
+"Manifest"="file:///C:\\Program Files\\Microsoft OfficePLUS\\3.10.0.28331\\exceladdin\\MSOPExcelAddin.vsto|vstolocal"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS]
+"Description"="Microsoft OfficePLUS"
+"FriendlyName"="Microsoft OfficePLUS"
+"LoadBehavior"=dword:00000003
+"Manifest"="file:///C:\\Program Files\\Microsoft OfficePLUS\\3.10.0.28331\\powerpntaddin\\MSOPPowerPNTAddin.vsto|vstolocal"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\MSOfficePLUS]
+"DisplayName"="微软OfficePLUS"
+"UninstallString"="\"C:\\Program Files\\Microsoft OfficePLUS\\3.10.0.28331\\uninst.exe\""
+"DisplayIcon"="C:\\Program Files\\Microsoft OfficePLUS\\3.10.0.28331\\uninst.exe"
+"DisplayVersion"="3.10.0.28331"
+"Publisher"="Microsoft Corporation"
+"InstallLocation"="C:\\Program Files\\Microsoft OfficePLUS"
+"ProductSource"="MSuite"
+"InstallTime"="2025-06-28 01:49:41"
+"ContextMenuVersion"="4.0.0.0"
+
+[HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\Office\Word\Addins\MSOfficePLUS]
+"Description"="Microsoft OfficePLUS"
+"FriendlyName"="Microsoft OfficePLUS"
+"LoadBehavior"=dword:00000003
+"Manifest"="file:///C:\\Program Files\\Microsoft OfficePLUS\\3.10.0.28331\\wordaddin\\MSOPWordAddin.vsto|vstolocal"
+
+[HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\Office\Excel\Addins\MSOfficePLUS]
+"Description"="Microsoft OfficePLUS"
+"FriendlyName"="Microsoft OfficePLUS"
+"LoadBehavior"=dword:00000003
+"Manifest"="file:///C:\\Program Files\\Microsoft OfficePLUS\\3.10.0.28331\\exceladdin\\MSOPExcelAddin.vsto|vstolocal"
+
+[HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS]
+"Description"="Microsoft OfficePLUS"
+"FriendlyName"="Microsoft OfficePLUS"
+"LoadBehavior"=dword:00000003
+"Manifest"="file:///C:\\Program Files\\Microsoft OfficePLUS\\3.10.0.28331\\powerpntaddin\\MSOPPowerPNTAddin.vsto|vstolocal"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Office\Word\Addins\MSOfficePLUS]
+"LoadBehavior"=dword:00000002
+"FeaturesGate"="{\"RefreshIntervalInMinutes\":120,\"FeatureName2Percent\":{\"Ribbon_PaperCheck\":100},\"LastUpdateTime\":\"2025-06-10T08:49:32.3912515Z\",\"FileName\":\"\"}"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Office\Excel\Addins\MSOfficePLUS]
+"LoadBehavior"=dword:00000002
+
+[HKEY_CURRENT_USER\Software\Microsoft\Office\PowerPoint\Addins\MSOfficePLUS]
+"LoadBehavior"=dword:00000002
+"FeaturesGate"="{\"RefreshIntervalInMinutes\":60,\"FeatureName2Percent\":{\"Ribbon_ChartBeauty\":0,\"Ribbon_PaperCheck\":100,\"Ribbon_TableBeauty\":0},\"LastUpdateTime\":\"2025-06-10T08:49:04.5737931Z\",\"FileName\":\"\"}"
