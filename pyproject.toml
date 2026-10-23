@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "remove-officeplus"
-version = "1.1.0"
+version = "1.2.0"
 description = "清理微软 OfficePLUS 加载项及残留"
 readme = "README.md"
 authors = [{ name = "程小宝 (Cheng Xiaobao)" }]
