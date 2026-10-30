@@ -4,8 +4,8 @@
 
 一键清理「微软 OfficePLUS」Office 加载项、后台服务和残留文件，删除前自动备份注册表。
 
-[![CI](https://github.com/HenryYannis/remove-officeplus/actions/workflows/ci.yml/badge.svg)](https://github.com/HenryYannis/remove-officeplus/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/HenryYannis/remove-officeplus)](https://github.com/HenryYannis/remove-officeplus/releases)
+[![CI](https://github.com/HenryYannis/Remove-OfficePlus/actions/workflows/ci.yml/badge.svg)](https://github.com/HenryYannis/Remove-OfficePlus/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/HenryYannis/remove-officeplus)](https://github.com/HenryYannis/Remove-OfficePlus/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6.svg?logo=windows)
 
@@ -53,7 +53,7 @@
 
 ### 方式 1：下载 exe（推荐）
 
-1. 到 [Releases 页面](https://github.com/HenryYannis/remove-officeplus/releases) 下载最新的 `Remove-OfficePlus-GUI-v版本号.exe`（例如 `Remove-OfficePlus-GUI-v1.3.0.exe`）。打不开 GitHub 的话，可以从[国内下载页](https://files.xbkjz.cn/apps/officeplus/)下载。程序窗口右下角显示当前版本号，点「下载最新版」会打开国内下载页。
+1. 到 [Releases 页面](https://github.com/HenryYannis/Remove-OfficePlus/releases) 下载最新的 `Remove-OfficePlus-GUI-v版本号.exe`（例如 `Remove-OfficePlus-GUI-v1.3.0.exe`）。打不开 GitHub 的话，可以从[国内下载页](https://files.xbkjz.cn/apps/officeplus/)下载。程序窗口右下角显示当前版本号，点「下载最新版」会打开国内下载页。
 2. 双击运行，在 UAC 提示中点「是」。
 3. 点「一键清理」，程序会自动清理并复检。
 
@@ -219,7 +219,7 @@ Release 里附有 `SHA256SUMS.txt`。在 PowerShell 里运行 `Get-FileHash .\Re
 
 ## 开源协议
 
-[MIT](LICENSE) © 程小宝
+[MIT](LICENSE) © 2026 程小宝
 
 官网：[xbkjz.cn](https://xbkjz.cn)
 
